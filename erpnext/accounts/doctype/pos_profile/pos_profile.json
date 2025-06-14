@@ -60,7 +60,8 @@
   "cost_center",
   "dimension_col_break",
   "security_section",
-  "password_manager"
+  "password_manager",
+  "secure_mode"
  ],
  "fields": [
   {
@@ -415,6 +416,12 @@
    "fieldtype": "Link",
    "label": "Formato de cierre de caja",
    "options": "Print Format"
+  },
+  {
+   "default": "0",
+   "fieldname": "secure_mode",
+   "fieldtype": "Check",
+   "label": "Modo Seguro"
   }
  ],
  "icon": "icon-cog",
@@ -442,7 +449,7 @@
    "link_fieldname": "pos_profile"
   }
  ],
- "modified": "2025-05-30 13:07:42.140389",
+ "modified": "2025-06-14 10:54:58.805769",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "POS Profile",
