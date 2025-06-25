@@ -31,7 +31,8 @@ def execute(filters=None):
 		},
 		{
 			"fieldname": "document",
-   			"fieldtype": "Data",
+   			"fieldtype": "Link",
+			"options": "Sales Invoice",
    			"label": "Documento",
 			"width": 140
 		},
@@ -110,7 +111,7 @@ def execute(filters=None):
 			sales.taxed_amount_15,
 			sales.isv_15,
 			sales.taxed_amount_18,
-			sales.isv_15,
+			sales.isv_18,
 			sales.discount_amount,
 			sales.rounded_total,
 			sales.grand_total
