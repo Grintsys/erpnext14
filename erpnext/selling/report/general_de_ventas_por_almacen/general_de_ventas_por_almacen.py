@@ -12,28 +12,10 @@ def execute(filters=None):
 
 	columns = [
 		{
-   			"fieldname": "date",
-  			"fieldtype": "Date",
-  			"label": "Fecha",
-			"width": 100
-  		},
-		{
-			"fieldname": "rtn",
-   			"fieldtype": "Data",
-   			"label": "RTN",
-			"width": 120
-		},
-		{
-			"fieldname": "name",
-   			"fieldtype": "Data",
-   			"label": "Nombre",
-			"width": 140
-		},
-		{
-			"fieldname": "document",
+			"fieldname": "warehouse",
    			"fieldtype": "Link",
-			"options": "Sales Invoice",
-   			"label": "Documento",
+			"options": "Warehouse",
+   			"label": "Almacen",
 			"width": 140
 		},
 		{
@@ -112,49 +94,75 @@ def execute(filters=None):
 
 	data = []
 
-	conditions = return_filters(filters)
-	sales_invoice = frappe.get_all("Sales Invoice", ["*"], filters = conditions, order_by='name')
-	
-	for sales in sales_invoice:
-		customer = frappe.get_doc("Customer", sales.customer)
-		type_document = "Factura de venta"
-		if(sales.is_return): type_document = "Devolución"
+	warehouses = frappe.get_all("Warehouse", ["*"])
 
-		cost = 0
-		utility = 0
-		utility_percentage = 0
+	for warehouse in warehouses:
+		row = addRow(filters, warehouse, "Factura de venta", 0)
+		if row and row[8] != 0:
+			data.append(row)
 
-		sales_invoice_items = frappe.get_all("Sales Invoice Item", ["*"], filters = {"parent": sales.name})
-
-		for item in sales_invoice_items:
-			cost += item.incoming_rate
-			utility += item.rate - item.incoming_rate
-		
-		utility_percentage += (utility/cost) * 100
-
-		row = [
-			sales.posting_date,
-			customer.tax_id,
-			sales.customer,
-			sales.name,
-			type_document,
-			sales.exempt_amount,
-			sales.taxed_amount_15,
-			sales.isv_15,
-			sales.taxed_amount_18,
-			sales.isv_18,
-			sales.discount_amount,
-			sales.rounded_total,
-			sales.grand_total,
-			cost,
-			utility,
-			utility_percentage
-		]
-		data.append(row)
+		row_return = addRow(filters, warehouse, "Devolución", 1)
+		if row_return and row_return[8] != 0:
+			data.append(row_return)
 
 	return columns, data
 
-def return_filters(filters):
+def addRow(filters, warehouse, type_document, is_return):
+	total_exempt = 0
+	base_isv_15 = 0
+	isv_15 = 0
+	base_isv_18 = 0
+	isv_18 = 0
+	discount_amount = 0
+	total = 0
+	total_final = 0
+	cost = 0
+	utility = 0
+	utility_percentage = 0
+
+	profiles = frappe.get_all("POS Profile", ["*"], filters = {"warehouse": warehouse.name})
+
+	for profile in profiles:
+		conditions = return_filters(filters, profile.name, is_return)
+		sales_invoice = frappe.get_all("Sales Invoice", ["*"], filters = conditions, order_by='name')
+
+		for sale in sales_invoice:
+
+			sales_invoice_items = frappe.get_all("Sales Invoice Item", ["*"], filters = {"parent": sale.name})
+
+			for item in sales_invoice_items:
+				cost += item.incoming_rate
+				utility += item.rate - item.incoming_rate
+			
+			utility_percentage += (utility/cost) * 100
+			total_exempt += sale.exempt_amount
+			base_isv_15 += sale.taxed_amount_15
+			isv_15 += sale.isv_15
+			base_isv_18 += sale.taxed_amount_18
+			isv_18 += sale.isv_18
+			discount_amount += sale.discount_amount
+			total += sale.rounded_total
+			total_final += sale.grand_total
+		
+	row = [
+		warehouse.name,
+		type_document,
+		total_exempt,
+		base_isv_15,
+		isv_15,
+		base_isv_18,
+		isv_18,
+		discount_amount,
+		total,
+		total_final,
+		cost,
+		utility,
+		utility_percentage
+	]
+
+	return row
+
+def return_filters(filters, pos_profile, is_return):
 	conditions = ''
 
 	conditions += "{"
@@ -164,6 +172,8 @@ def return_filters(filters):
 		)
 
 	if filters.get("company"): conditions += ', "company": "{}"'.format(filters.get("company"))
+	conditions += ', "pos_profile": "{}"'.format(pos_profile)
+	conditions += ', "is_return": {}'.format(is_return)
 	conditions += '}'
 
 	return conditions
