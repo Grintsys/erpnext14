@@ -130,7 +130,8 @@ def execute(filters=None):
 			cost += item.incoming_rate
 			utility += item.rate - item.incoming_rate
 		
-		utility_percentage += (utility/cost) * 100
+		if cost > 0:
+    		utility_percentage = (utility / cost) * 100
 
 		row = [
 			sales.posting_date,

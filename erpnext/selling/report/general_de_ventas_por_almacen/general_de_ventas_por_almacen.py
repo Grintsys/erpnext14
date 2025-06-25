@@ -134,7 +134,9 @@ def addRow(filters, warehouse, type_document, is_return):
 				cost += item.incoming_rate
 				utility += item.rate - item.incoming_rate
 			
-			utility_percentage += (utility/cost) * 100
+			if cost > 0:
+    			utility_percentage = (utility / cost) * 100
+				
 			total_exempt += sale.exempt_amount
 			base_isv_15 += sale.taxed_amount_15
 			isv_15 += sale.isv_15
