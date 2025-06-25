@@ -138,7 +138,7 @@ def execute(filters=None):
 			sales.taxed_amount_15,
 			sales.isv_15,
 			sales.taxed_amount_18,
-			sales.isv_15
+			sales.isv_18
 		]
 		data.append(row)
 

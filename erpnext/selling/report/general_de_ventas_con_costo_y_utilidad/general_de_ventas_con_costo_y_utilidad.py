@@ -89,6 +89,24 @@ def execute(filters=None):
    			"fieldtype": "Currency",
    			"label": "Total Final",
 			"width": 110
+		},		
+		{
+			"fieldname": "cost",
+   			"fieldtype": "Currency",
+   			"label": "Costo",
+			"width": 110
+		},		
+		{
+			"fieldname": "utility",
+   			"fieldtype": "Currency",
+   			"label": "Utilidad",
+			"width": 110
+		},		
+		{
+			"fieldname": "utility_percentage",
+   			"fieldtype": "Currency",
+   			"label": "% Utilidad",
+			"width": 110
 		}
 	]
 
@@ -99,8 +117,22 @@ def execute(filters=None):
 	
 	for sales in sales_invoice:
 		customer = frappe.get_doc("Customer", sales.customer)
-		type_document = "Factura"
+		type_document = "Factura de venta"
 		if(sales.is_return): type_document = "Devolución"
+
+		cost = 0
+		utility = 0
+		utility_percentage = 0
+
+		sales_invoice_items = frappe.get_all("Sales Invoice Item", ["*"], filters = {"parent": sales.name})
+
+		for item in sales_invoice_items:
+			cost += item.incoming_rate
+			utility += item.rate - item.incoming_rate
+		
+		if cost > 0:
+			utility_percentage = (utility / cost) * 100
+
 		row = [
 			sales.posting_date,
 			customer.tax_id,
@@ -114,7 +146,10 @@ def execute(filters=None):
 			sales.isv_18,
 			sales.discount_amount,
 			sales.rounded_total,
-			sales.grand_total
+			sales.grand_total,
+			cost,
+			utility,
+			utility_percentage
 		]
 		data.append(row)
 
