@@ -100,7 +100,7 @@ def return_filters(filters, pos_profile, is_return):
     if filters.get("from_date") and filters.get("to_date"):
         conditions["posting_date"] = ["between", [filters["from_date"], filters["to_date"]]]
     if filters.get("company"):
-        conditions["company"] = filters.get("company"]
+        conditions["company"] = filters.get("company")
     conditions["pos_profile"] = pos_profile
     conditions["is_return"] = is_return
     return conditions
