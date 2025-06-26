@@ -60,9 +60,9 @@ def execute(filters=None):
             sales.taxed_amount_18,
             sales.isv_18,
             sales.discount_amount,
+            monto_bruto,
             sales.rounded_total,
-            sales.grand_total,
-            monto_bruto  # NUEVO CAMPO
+            sales.grand_total
         ]
         data.append(row)
 

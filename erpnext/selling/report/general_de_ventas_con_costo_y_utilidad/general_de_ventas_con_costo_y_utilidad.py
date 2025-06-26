@@ -77,9 +77,9 @@ def execute(filters=None):
             sales.taxed_amount_18,
             sales.isv_18,
             sales.discount_amount,
+            gross_amount,
             sales.rounded_total,
             sales.grand_total,
-            gross_amount,
             cost,
             utility,
             utility_percentage
