@@ -476,12 +476,56 @@
    "dependencies": "Sales Invoice",
    "hidden": 0,
    "is_query_report": 1,
-   "label": "Sales Payment Summary",
+   "label": "General de ventas",
    "link_count": 0,
-   "link_to": "Sales Payment Summary",
+   "link_to": "General de ventas",
    "link_type": "Report",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+    "dependencies": "Sales Invoice",
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "General de ventas con costo y utilidad",
+    "link_count": 0,
+    "link_to": "General de ventas con costo y utilidad",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+  },
+  {
+    "dependencies": "Sales Invoice",
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "General de ventas por almacen",
+    "link_count": 0,
+    "link_to": "General de ventas por almacen",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+  },
+  {
+    "dependencies": "Sales Invoice",
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Resumen diario",
+    "link_count": 0,
+    "link_to": "Resumen diario",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
+  },
+  {
+    "dependencies": "Sales Invoice",
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Ventas del día",
+    "link_count": 0,
+    "link_to": "Ventas del día",
+    "link_type": "Report",
+    "onboard": 0,
+    "type": "Link"
   },
   {
    "dependencies": "Address",
