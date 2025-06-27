@@ -638,3 +638,5 @@ extend_bootinfo = [
 ]
 
 fields_for_group_similar_items = ["qty", "amount"]
+
+fixtures = ["Report"]
