@@ -7,25 +7,72 @@ from frappe import _
 app_name = "erpnext"
 app_title = "ERPNext"
 app_publisher = "Frappe Technologies Pvt. Ltd."
-app_description = "ERP made simple"
-app_icon = "octicon octicon-briefcase"
-app_color = "grey"
+app_description = """ERP made simple"""
+app_icon = "fa fa-th"
+app_color = "#e74c3c"
 app_email = "info@erpnext.com"
-app_license = "GNU General Public License v3"
+app_license = "GNU General Public License (v3)"
+source_link = "https://github.com/frappe/erpnext"
+app_logo_url = "/assets/erpnext/images/erpnext-logo.svg"
 
-# Fixtures to include Workspace configuration
-fixtures = [
-    {
-        "dt": "Workspace",
-        "filters": [["name", "in", ["Accounting"]]]
-    }
+
+develop_version = "14.x.x-develop"
+
+app_include_js = "erpnext.bundle.js"
+app_include_css = "erpnext.bundle.css"
+web_include_js = "erpnext-web.bundle.js"
+web_include_css = "erpnext-web.bundle.css"
+email_css = "erpnext_email.bundle.scss"
+
+doctype_js = {
+	"Address": "public/js/address.js",
+	"Communication": "public/js/communication.js",
+	"Event": "public/js/event.js",
+	"Newsletter": "public/js/newsletter.js",
+	"Contact": "public/js/contact.js",
+}
+
+override_doctype_class = {"Address": "erpnext.accounts.custom.address.ERPNextAddress"}
+
+welcome_email = "erpnext.setup.utils.welcome_email"
+
+# setup wizard
+setup_wizard_requires = "assets/erpnext/js/setup_wizard.js"
+setup_wizard_stages = "erpnext.setup.setup_wizard.setup_wizard.get_setup_stages"
+setup_wizard_test = "erpnext.setup.setup_wizard.test_setup_wizard.run_setup_wizard_test"
+
+before_install = "erpnext.setup.install.check_setup_wizard_not_completed"
+after_install = "erpnext.setup.install.after_install"
+
+boot_session = "erpnext.startup.boot.boot_session"
+notification_config = "erpnext.startup.notifications.get_notification_config"
+get_help_messages = "erpnext.utilities.activation.get_help_messages"
+leaderboards = "erpnext.startup.leaderboard.get_leaderboards"
+filters_config = "erpnext.startup.filters.get_filters_config"
+additional_print_settings = "erpnext.controllers.print_settings.get_print_settings"
+
+on_session_creation = [
+	"erpnext.portal.utils.create_customer_or_supplier",
+	"erpnext.e_commerce.shopping_cart.utils.set_cart_count",
+]
+on_logout = "erpnext.e_commerce.shopping_cart.utils.clear_cart_count"
+
+treeviews = [
+	"Account",
+	"Cost Center",
+	"Warehouse",
+	"Item Group",
+	"Customer Group",
+	"Supplier Group",
+	"Sales Person",
+	"Territory",
+	"Department",
 ]
 
-# Run function to rebuild Accounting workspace after migrations
-after_migrate = [
-    "erpnext.accounts.report.utils.rebuild_accounting_workspace"
+# website
+update_website_context = [
+	"erpnext.e_commerce.shopping_cart.utils.update_website_context",
 ]
-
 my_account_context = "erpnext.e_commerce.shopping_cart.utils.update_my_account_context"
 webform_list_context = "erpnext.controllers.website_list_for_contact.get_webform_list_context"
 
@@ -598,5 +645,5 @@ extend_bootinfo = [
 
 fields_for_group_similar_items = ["qty", "amount"]
 
-fixtures = ["Report"]
+
 
