@@ -8,8 +8,8 @@ def execute(filters=None):
 
 def get_columns():
     return [
-        {"label": "Documento", "fieldname": "name", "fieldtype": "Link", "options": "Sales Invoice", "width": 120},
         {"label": "Fecha", "fieldname": "posting_date", "fieldtype": "Date", "width": 100},
+        {"label": "Documento", "fieldname": "name", "fieldtype": "Link", "options": "Sales Invoice", "width": 120},
         {"label": "Cliente", "fieldname": "customer_name", "fieldtype": "Data", "width": 200},
         {"label": "Código", "fieldname": "item_code", "fieldtype": "Data", "width": 100},
         {"label": "Descripción", "fieldname": "item_name", "fieldtype": "Data", "width": 200},
@@ -72,8 +72,8 @@ def get_data(filters):
         porc_utilidad = min(porc_utilidad, 100)
 
         datos.append({
-            "name": row.name,
             "posting_date": row.posting_date,
+            "name": row.name,
             "customer_name": row.customer_name,
             "item_code": row.item_code,
             "item_name": row.item_name,

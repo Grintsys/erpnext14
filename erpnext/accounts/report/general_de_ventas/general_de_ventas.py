@@ -51,7 +51,7 @@ def get_data(filters):
     
     data = []
     for sales in sales_invoice:
-        type_document = "CR" if sales.naming_series and "CR" in sales.naming_series else "FC"
+        type_document = "Devolucion" if sales.naming_series and "Devolucion" in sales.naming_series else "Factura"
         monto_bruto = (
             flt(sales.exempt_amount)
             + flt(sales.taxed_amount_15)
