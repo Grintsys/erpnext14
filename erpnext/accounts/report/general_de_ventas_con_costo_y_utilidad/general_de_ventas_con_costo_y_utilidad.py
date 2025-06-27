@@ -1,92 +1,101 @@
+from __future__ import unicode_literals
 import frappe
 from frappe.utils import flt
 
 def execute(filters=None):
-    columns = get_columns()
-    data = get_data(filters)
-    return columns, data
+	if not filters: filters = {}
 
-def get_columns():
-    return [
-        {"label": "Fecha", "fieldname": "posting_date", "fieldtype": "Date", "width": 100},
-        {"label": "Documento", "fieldname": "name", "fieldtype": "Link", "options": "Sales Invoice", "width": 120},
-        {"label": "Cliente", "fieldname": "customer_name", "fieldtype": "Data", "width": 200},
-        {"label": "Código", "fieldname": "item_code", "fieldtype": "Data", "width": 100},
-        {"label": "Descripción", "fieldname": "item_name", "fieldtype": "Data", "width": 200},
-        {"label": "Cantidad", "fieldname": "qty", "fieldtype": "Float", "width": 80},
-        {"label": "Precio", "fieldname": "rate", "fieldtype": "Currency", "width": 80},
-        {"label": "Descuentos", "fieldname": "discount_amount", "fieldtype": "Currency", "width": 100},
-        {"label": "Exento", "fieldname": "exento", "fieldtype": "Currency", "width": 100},
-        {"label": "Base 15%", "fieldname": "base_15", "fieldtype": "Currency", "width": 100},
-        {"label": "Base 18%", "fieldname": "base_18", "fieldtype": "Currency", "width": 100},
-        {"label": "Monto Bruto", "fieldname": "monto_bruto", "fieldtype": "Currency", "width": 120},
-        {"label": "Costo", "fieldname": "costo_total", "fieldtype": "Currency", "width": 100},
-        {"label": "Utilidad", "fieldname": "utilidad", "fieldtype": "Currency", "width": 100},
-        {"label": "% Utilidad", "fieldname": "porc_utilidad", "fieldtype": "Percent", "width": 100},
-    ]
+	columns = [
+		{"fieldname": "date", "fieldtype": "Date", "label": "Fecha", "width": 100},
+		{"fieldname": "type_document", "fieldtype": "Data", "label": "Documento", "width": 100},
+  		{"fieldname": "document", "fieldtype": "Link", "options": "Sales Invoice", "label": "Documento", "width": 180},
+		{"fieldname": "name", "fieldtype": "Data", "label": "Nombre", "width": 140},
+		{"fieldname": "rtn", "fieldtype": "Data", "label": "RTN", "width": 120},
+		{"fieldname": "total_exempt", "fieldtype": "Currency", "label": "Total Exento", "width": 110},
+		{"fieldname": "base_isv_15%", "fieldtype": "Currency", "label": "Base ISV 15%", "width": 110},
+		{"fieldname": "isv_15%", "fieldtype": "Currency", "label": "ISV 15%", "width": 110},
+		{"fieldname": "base_isv_18%", "fieldtype": "Currency", "label": "Base ISV 18%", "width": 110},
+		{"fieldname": "isv_18%", "fieldtype": "Currency", "label": "ISV 18%", "width": 110},
+		{"fieldname": "discount_amount", "fieldtype": "Currency", "label": "Descuento", "width": 110},
+		{"fieldname": "monto_bruto", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
+		{"fieldname": "total", "fieldtype": "Currency", "label": "Total", "width": 110},
+		{"fieldname": "total_final", "fieldtype": "Currency", "label": "Total Final", "width": 110},
+		{"fieldname": "cost", "fieldtype": "Currency", "label": "Costo", "width": 110},
+		{"fieldname": "utility", "fieldtype": "Currency", "label": "Utilidad", "width": 110},
+		{"fieldname": "utility_percentage", "fieldtype": "Percent", "label": "% Utilidad", "width": 110}
+	]
 
-def get_data(filters):
-    condiciones = ""
-    if filters.get("from_date"):
-        condiciones += f" AND si.posting_date >= '{filters['from_date']}'"
-    if filters.get("to_date"):
-        condiciones += f" AND si.posting_date <= '{filters['to_date']}'"
+	data = []
 
-    resultados = frappe.db.sql(f"""
-        SELECT 
-            si.name,
-            si.posting_date,
-            si.customer_name,
-            sii.item_code,
-            sii.item_name,
-            sii.qty,
-            sii.rate,
-            sii.discount_amount,
-            sii.base_net_amount,
-            sii.base_amount,
-            sii.item_tax_rate,
-            sii.base_net_amount * sii.qty as base_total,
-            sii.cost_center,
-            sii.income_account,
-            sii.expense_account,
-            sii.base_rate,
-            sii.base_net_rate,
-            sii.base_net_amount / NULLIF(sii.qty, 0) as costo_unitario
-        FROM 
-            `tabSales Invoice Item` sii
-        INNER JOIN `tabSales Invoice` si ON sii.parent = si.name
-        WHERE si.docstatus = 1 {condiciones}
-    """, as_dict=True)
+	conditions = return_filters(filters)
 
-    datos = []
-    for row in resultados:
-        # Simulación simple de cómo diferenciar impuestos
-        base_15 = row.base_amount * 0.15 if "15" in str(row.item_tax_rate) else 0
-        base_18 = row.base_amount * 0.18 if "18" in str(row.item_tax_rate) else 0
-        exento = 0 if base_15 or base_18 else row.base_amount
+	sales_invoices = frappe.get_all(
+		"Sales Invoice",
+		fields=["name", "posting_date", "customer", "is_return", "exempt_amount", "taxed_amount_15", "isv_15", "taxed_amount_18", "isv_18", "discount_amount", "rounded_total", "grand_total"],
+		filters=conditions,
+		order_by="name"
+	)
 
-        monto_bruto = flt(exento) + flt(base_15) + flt(base_18) - flt(row.discount_amount)
-        costo_total = flt(row.costo_unitario) * flt(row.qty)
-        utilidad = monto_bruto - costo_total
-        porc_utilidad = (utilidad / monto_bruto * 100) if monto_bruto else 0
-        porc_utilidad = min(porc_utilidad, 100)
+	# Obtener clientes únicos de un solo viaje
+	customers = {
+		c.name: c.tax_id for c in frappe.get_all(
+			"Customer",
+			fields=["name", "tax_id"],
+			filters={"name": ["in", [inv.customer for inv in sales_invoices]]}
+		)
+	}
 
-        datos.append({
-            "posting_date": row.posting_date,
-            "name": row.name,
-            "customer_name": row.customer_name,
-            "item_code": row.item_code,
-            "item_name": row.item_name,
-            "qty": row.qty,
-            "rate": row.rate,
-            "discount_amount": row.discount_amount,
-            "exento": exento,
-            "base_15": base_15,
-            "base_18": base_18,
-            "monto_bruto": monto_bruto,
-            "costo_total": costo_total,
-            "utilidad": utilidad,
-            "porc_utilidad": porc_utilidad,
-        })
+	for sales in sales_invoices:
+		type_document = "Devolución" if sales.is_return else "Factura"
 
-    return datos
+		# Calcular costo
+		cost = sum(flt(item.qty) * flt(item.incoming_rate) for item in frappe.get_all(
+			"Sales Invoice Item",
+			fields=["qty", "incoming_rate"],
+			filters={"parent": sales.name}
+		))
+
+		# Calcular Monto Bruto
+		monto_bruto = (
+			flt(sales.exempt_amount)
+			+ flt(sales.taxed_amount_15)
+			+ flt(sales.taxed_amount_18)
+			- flt(sales.discount_amount)
+		)
+
+		# Calcular Utilidad y % Utilidad
+		utility = monto_bruto - cost
+		utility_percentage = (utility / monto_bruto * 100) if monto_bruto > 0 else 0
+		utility_percentage = min(utility_percentage, 100)
+
+		row = [
+			sales.posting_date,
+   			type_document,		
+   			sales.name,
+			sales.customer,		
+   			customers.get(sales.customer),
+			sales.exempt_amount,
+			sales.taxed_amount_15,
+			sales.isv_15,
+			sales.taxed_amount_18,
+			sales.isv_18,
+			sales.discount_amount,
+			monto_bruto,
+			sales.rounded_total,
+			sales.grand_total,
+			cost,
+			utility,
+			utility_percentage
+		]
+		data.append(row)
+
+	return columns, data
+
+
+def return_filters(filters):
+	conditions = {}
+	if filters.get("from_date") and filters.get("to_date"):
+		conditions["posting_date"] = ["between", [filters["from_date"], filters["to_date"]]]
+	if filters.get("company"):
+		conditions["company"] = filters.get("company")
+	return conditions
