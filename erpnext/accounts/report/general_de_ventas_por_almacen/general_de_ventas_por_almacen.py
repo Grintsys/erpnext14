@@ -16,7 +16,7 @@ def execute(filters=None):
 		{"fieldname": "isv_18%", "fieldtype": "Currency", "label": "ISV 18%", "width": 110},
 		{"fieldname": "discount_amount", "fieldtype": "Currency", "label": "Descuento", "width": 110},
 		{"fieldname": "gross_amount", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
-		{"fieldname": "total_calculated", "fieldtype": "Currency", "label": "Total Calculado", "width": 110},
+		{"fieldname": "total", "fieldtype": "Currency", "label": "Total", "width": 110},
 		{"fieldname": "total_rounded", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110},
 		{"fieldname": "cost", "fieldtype": "Currency", "label": "Costo", "width": 110},
 		{"fieldname": "utility", "fieldtype": "Currency", "label": "Utilidad", "width": 110},
@@ -66,7 +66,7 @@ def add_row(filters, warehouse, type_document, is_return):
 			total_rounded += flt(sale.rounded_total)
 
 	# total calculado a mano
-	total_calculated = flt(total_exempt) + flt(base_isv_15) + flt(isv_15) + flt(base_isv_18) + flt(isv_18) - flt(discount_amount)
+	total = flt(total_exempt) + flt(base_isv_15) + flt(isv_15) + flt(base_isv_18) + flt(isv_18) - flt(discount_amount)
 	monto_bruto = total_calculated
 	utility = monto_bruto - flt(cost)
 	utility_percentage = (utility * 100 / monto_bruto) if monto_bruto > 0 else 0
@@ -82,7 +82,7 @@ def add_row(filters, warehouse, type_document, is_return):
 		isv_18,
 		discount_amount,
 		monto_bruto,
-		total_calculated,
+		total,
 		total_rounded,
 		cost,
 		utility,
