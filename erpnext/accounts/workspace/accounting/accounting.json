@@ -492,6 +492,7 @@
     "link_count": 0,
     "link_to": "General de ventas con costo y utilidad",
     "link_type": "Report",
+    "for_doctype": "Sales Invoice",
     "onboard": 0,
     "only_for": "Accounts",
     "type": "Link"
@@ -504,6 +505,7 @@
     "link_count": 0,
     "link_to": "General de ventas por almacen",
     "link_type": "Report",
+    "for_doctype": "Sales Invoice",
     "onboard": 0,
     "only_for": "Accounts",
     "type": "Link"
@@ -516,6 +518,7 @@
     "link_count": 0,
     "link_to": "Resumen diario",
     "link_type": "Report",
+    "for_doctype": "Sales Invoice",
     "onboard": 0,
     "only_for": "Accounts",
     "type": "Link"
@@ -528,6 +531,7 @@
     "link_count": 0,
     "link_to": "Ventas del día",
     "link_type": "Report",
+    "for_doctype": "Sales Invoice",
     "onboard": 0,
     "only_for": "Accounts",
     "type": "Link"
