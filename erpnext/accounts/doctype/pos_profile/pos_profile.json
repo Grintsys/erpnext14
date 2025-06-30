@@ -61,7 +61,8 @@
   "dimension_col_break",
   "security_section",
   "password_manager",
-  "secure_mode"
+  "secure_mode",
+  "create_vale"
  ],
  "fields": [
   {
@@ -422,6 +423,12 @@
    "fieldname": "secure_mode",
    "fieldtype": "Check",
    "label": "Modo Seguro"
+  },
+  {
+   "default": "0",
+   "fieldname": "create_vale",
+   "fieldtype": "Check",
+   "label": "Crear Vale"
   }
  ],
  "icon": "icon-cog",
@@ -449,7 +456,7 @@
    "link_fieldname": "pos_profile"
   }
  ],
- "modified": "2025-06-14 10:54:58.805769",
+ "modified": "2025-06-30 17:11:12.773610",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "POS Profile",
