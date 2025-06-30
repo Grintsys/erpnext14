@@ -1,3 +1,9 @@
+# Copyright (c) 2015, Frappe Technologies Pvt. Ltd. and Contributors
+# License: GNU General Public License v3. See license.txt
+
+from __future__ import unicode_literals
+from frappe import _
+
 app_name = "erpnext"
 app_title = "ERPNext"
 app_publisher = "Frappe Technologies Pvt. Ltd."
@@ -638,3 +644,6 @@ extend_bootinfo = [
 ]
 
 fields_for_group_similar_items = ["qty", "amount"]
+
+
+

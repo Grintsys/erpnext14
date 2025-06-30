@@ -389,3 +389,15 @@ def get_opening_row(party_type, party, from_date, company):
 			& (gle.is_cancelled == 0)
 		)
 	).run(as_dict=True)
+
+def after_migrate():
+    if frappe.db.exists("Workspace", "Accounting"):
+        return
+
+    from frappe.desk.doctype.workspace.workspace import import_workspace
+
+    try:
+        import_workspace("accounting", "Accounts")
+        frappe.db.commit()
+    except Exception as e:
+        frappe.log_error(f"Error al importar el workspace 'Accounting': {e}")
