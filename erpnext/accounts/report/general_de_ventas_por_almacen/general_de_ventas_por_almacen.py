@@ -39,7 +39,7 @@ def execute(filters=None):
 
 def add_row(filters, warehouse, type_document, is_return):
 	total_exempt = base_isv_15 = isv_15 = base_isv_18 = isv_18 = 0
-	discount_amount = total_calculated = total_rounded = cost = utility = 0
+	discount_amount = total = total_rounded = cost = utility = 0
 
 	profiles = frappe.get_all("POS Profile", pluck="name", filters={"warehouse": warehouse})
 
@@ -61,13 +61,13 @@ def add_row(filters, warehouse, type_document, is_return):
 			base_isv_18 += flt(sale.taxed_amount_18)
 			isv_18 += flt(sale.isv_18)
 			discount_amount += flt(sale.discount_amount)
-
-			# total redondeado directo
 			total_rounded += flt(sale.rounded_total)
 
-	# total calculado a mano
+	# monto bruto SIN impuestos
+	monto_bruto = flt(total_exempt) + flt(base_isv_15) + flt(base_isv_18) - flt(discount_amount)
+
+	# total CON impuestos
 	total = flt(total_exempt) + flt(base_isv_15) + flt(isv_15) + flt(base_isv_18) + flt(isv_18) - flt(discount_amount)
-	monto_bruto = total_calculated
 	utility = monto_bruto - flt(cost)
 	utility_percentage = (utility * 100 / monto_bruto) if monto_bruto > 0 else 0
 	utility_percentage = max(0, min(utility_percentage, 100))
