@@ -19,7 +19,7 @@ def execute(filters=None):
 		{"fieldname": "discount_amount", "fieldtype": "Currency", "label": "Descuento", "width": 110},
 		{"fieldname": "monto_bruto", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
 		{"fieldname": "total", "fieldtype": "Currency", "label": "Total", "width": 110},
-		{"fieldname": "total_final", "fieldtype": "Currency", "label": "Total Final", "width": 110},
+		{"fieldname": "total_rounded", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110},
 		{"fieldname": "cost", "fieldtype": "Currency", "label": "Costo", "width": 110},
 		{"fieldname": "utility", "fieldtype": "Currency", "label": "Utilidad", "width": 110},
 		{"fieldname": "utility_percentage", "fieldtype": "Percent", "label": "% Utilidad", "width": 110}
@@ -63,6 +63,14 @@ def execute(filters=None):
 			- flt(sales.discount_amount)
 		)
 
+		# MODIFICADO: calcular total con ISV incluido
+		total = (
+			flt(sales.exempt_amount)
+			+ flt(sales.taxed_amount_15) + flt(sales.isv_15)
+			+ flt(sales.taxed_amount_18) + flt(sales.isv_18)
+			- flt(sales.discount_amount)
+		)
+
 		# Calcular Utilidad y % Utilidad
 		utility = monto_bruto - cost
 		utility_percentage = (utility / monto_bruto * 100) if monto_bruto > 0 else 0
@@ -81,8 +89,8 @@ def execute(filters=None):
 			sales.isv_18,
 			sales.discount_amount,
 			monto_bruto,
-			sales.rounded_total,
-			sales.grand_total,
+			total,
+			sales.rounded_total,  # total_rounded
 			cost,
 			utility,
 			utility_percentage
@@ -93,7 +101,7 @@ def execute(filters=None):
 
 
 def return_filters(filters):
-	conditions = {}
+	conditions = {"docstatus": 1}  # MODIFICADO: solo facturas validadas
 	if filters.get("from_date") and filters.get("to_date"):
 		conditions["posting_date"] = ["between", [filters["from_date"], filters["to_date"]]]
 	if filters.get("company"):

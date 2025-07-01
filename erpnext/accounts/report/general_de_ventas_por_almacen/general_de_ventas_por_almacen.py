@@ -92,7 +92,8 @@ def add_row(filters, warehouse, type_document, is_return):
 def build_conditions(filters, pos_profile, is_return):
 	conditions = {
 		"pos_profile": pos_profile,
-		"is_return": is_return
+		"is_return": is_return,
+  		"docstatus": 1
 	}
 	if filters.get("from_date") and filters.get("to_date"):
 		conditions["posting_date"] = ["between", [filters["from_date"], filters["to_date"]]]
