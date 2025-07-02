@@ -19,20 +19,19 @@ def execute(filters=None):
 		{"fieldname": "isv_18%", "fieldtype": "Currency", "label": "ISV 18%", "width": 110},
 		{"fieldname": "discount_amount", "fieldtype": "Currency", "label": "Descuento", "width": 110},
 		{"fieldname": "monto_bruto", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
-		{"fieldname": "total", "fieldtype": "Currency", "label": "Total", "width": 110},
-		{"fieldname": "total_final", "fieldtype": "Currency", "label": "Total Final", "width": 110}
+		{"fieldname": "total", "fieldtype": "Currency", "label": "Total", "width": 110},  # calculado
+		{"fieldname": "total_rounded", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110}  # antes "Total Final"
 	]
 
 	data = []
 
 	conditions = return_filters(filters)
-
-	# Solo los campos necesarios
+ 
 	fields = [
 		"name", "posting_date", "customer", "is_return",
 		"exempt_amount", "taxed_amount_15", "isv_15",
 		"taxed_amount_18", "isv_18", "discount_amount",
-		"rounded_total", "grand_total"
+		"rounded_total"
 	]
 
 	sales_invoices = frappe.get_all("Sales Invoice", fields=fields, filters=conditions, order_by="name")
@@ -42,11 +41,24 @@ def execute(filters=None):
 		type_document = "Devolución" if sales.is_return else "Factura"
 
 		# Calcular monto bruto
-		monto_bruto = flt(sales.exempt_amount) + flt(sales.taxed_amount_15) + flt(sales.taxed_amount_18) - flt(sales.discount_amount)
+		monto_bruto = (
+			flt(sales.exempt_amount)
+			+ flt(sales.taxed_amount_15)
+			+ flt(sales.taxed_amount_18)
+			- flt(sales.discount_amount)
+		)
+
+		# Nuevo cálculo del total
+		total = (
+			flt(sales.exempt_amount)
+			+ flt(sales.taxed_amount_15) + flt(sales.isv_15)
+			+ flt(sales.taxed_amount_18) + flt(sales.isv_18)
+			- flt(sales.discount_amount)
+		)
 
 		row = [
 			sales.posting_date,
-   			type_document,
+			type_document,
 			sales.name,
 			sales.customer,
 			rtn,
@@ -57,8 +69,8 @@ def execute(filters=None):
 			sales.isv_18,
 			sales.discount_amount,
 			monto_bruto,
-			sales.rounded_total,
-			sales.grand_total
+			total,
+			sales.rounded_total  # ahora es Total Redondeado
 		]
 		data.append(row)
 
@@ -67,7 +79,7 @@ def execute(filters=None):
 
 def return_filters(filters):
 	conditions = {
-		"docstatus": 1
+		"docstatus": 1  # Solo facturas validadas
 	}
 
 	if filters.get("from_date") and filters.get("to_date"):
