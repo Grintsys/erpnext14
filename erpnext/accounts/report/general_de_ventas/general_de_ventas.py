@@ -66,7 +66,9 @@ def execute(filters=None):
 
 
 def return_filters(filters):
-	conditions = {}
+	conditions = {
+		"docstatus": 1
+	}
 
 	if filters.get("from_date") and filters.get("to_date"):
 		conditions["posting_date"] = ["between", [filters["from_date"], filters["to_date"]]]
