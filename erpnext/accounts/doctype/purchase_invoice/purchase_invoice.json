@@ -90,6 +90,11 @@
   "base_rounding_adjustment",
   "base_rounded_total",
   "base_in_words",
+  "taxed_amount_15",
+  "taxed_amount_18",
+  "exempt_amount",
+  "isv_15",
+  "isv_18",
   "column_break8",
   "grand_total",
   "rounding_adjustment",
@@ -1390,12 +1395,12 @@
    "depends_on": "eval:doc.update_stock && doc.is_internal_supplier",
    "fieldname": "set_from_warehouse",
    "fieldtype": "Link",
+   "ignore_user_permissions": 1,
    "label": "Set From Warehouse",
    "no_copy": 1,
    "options": "Warehouse",
    "print_hide": 1,
    "print_width": "50px",
-   "ignore_user_permissions": 1,
    "width": "50px"
   },
   {
@@ -1605,13 +1610,43 @@
    "fieldname": "update_outstanding_for_self",
    "fieldtype": "Check",
    "label": "Update Outstanding for Self"
+  },
+  {
+   "fieldname": "taxed_amount_15",
+   "fieldtype": "Currency",
+   "label": "Taxed Amount 15%",
+   "read_only": 1
+  },
+  {
+   "fieldname": "taxed_amount_18",
+   "fieldtype": "Currency",
+   "label": "Taxed Amount 18%",
+   "read_only": 1
+  },
+  {
+   "fieldname": "exempt_amount",
+   "fieldtype": "Currency",
+   "label": "Exempt Amount",
+   "read_only": 1
+  },
+  {
+   "fieldname": "isv_15",
+   "fieldtype": "Currency",
+   "label": "ISV 15%",
+   "read_only": 1
+  },
+  {
+   "fieldname": "isv_18",
+   "fieldtype": "Currency",
+   "label": "ISV 18%",
+   "read_only": 1
   }
  ],
  "icon": "fa fa-file-text",
  "idx": 204,
  "is_submittable": 1,
  "links": [],
- "modified": "2024-09-11 12:59:19.130593",
+ "modified": "2025-07-03 20:38:25.631467",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "Purchase Invoice",
