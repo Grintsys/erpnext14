@@ -87,6 +87,8 @@ class PurchaseInvoice(BuyingController):
 		return self.on_hold and (not self.release_date or self.release_date > getdate(nowdate()))
 
 	def validate(self):
+		self.get_itemised_tax_info()
+		
 		if not self.is_opening:
 			self.is_opening = "No"
 
@@ -132,6 +134,34 @@ class PurchaseInvoice(BuyingController):
 		self.reset_default_field_value("rejected_warehouse", "items", "rejected_warehouse")
 		self.reset_default_field_value("set_from_warehouse", "items", "from_warehouse")
 		self.set_percentage_received()
+
+	def get_itemised_tax_info(self):
+		self.taxed_amount_15 = 0
+		self.isv_15 = 0
+		self.taxed_amount_18 = 0
+		self.isv_18 = 0
+		self.exempt_amount = 0
+
+		for item in self.items:
+			tax_template = frappe.get_doc("Item Tax Template", item.item_tax_template)
+				
+			for taxitem in tax_template.taxes:
+				if(taxitem.tax_rate == 15):
+					# self.taxed_amount_15 += item.amount - (item.amount*(taxitem.tax_rate/100))
+					# self.isv_15 += item.amount*(taxitem.tax_rate/100)
+
+					self.taxed_amount_15 += (item.amount + item.discount_amount)/1.15
+					self.isv_15 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.15)
+
+				if(taxitem.tax_rate == 18):
+					# self.taxed_amount_18 += item.amount - (item.amount*(taxitem.tax_rate/100))
+					# self.isv_18 += item.amount*(taxitem.tax_rate/100)
+
+					self.taxed_amount_18 += (item.amount+ item.discount_amount)/1.18
+					self.isv_18 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.18)
+
+				if(taxitem.tax_rate == 0):
+					self.exempt_amount += item.amount
 
 	def set_percentage_received(self):
 		total_billed_qty = 0.0
