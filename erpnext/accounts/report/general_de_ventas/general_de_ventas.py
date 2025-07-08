@@ -19,8 +19,8 @@ def execute(filters=None):
 		{"fieldname": "isv_18%", "fieldtype": "Currency", "label": "ISV 18%", "width": 110},
 		{"fieldname": "discount_amount", "fieldtype": "Currency", "label": "Descuento", "width": 110},
 		{"fieldname": "monto_bruto", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
-		{"fieldname": "grand_total", "fieldtype": "Currency", "label": "Total", "width": 110},  # calculado
-		{"fieldname": "total_rounded", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110}  # antes "Total Final"
+		{"fieldname": "grand_total", "fieldtype": "Currency", "label": "Total", "width": 110},
+		{"fieldname": "total_rounded", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110}
 	]
 
 	data = []
@@ -31,7 +31,7 @@ def execute(filters=None):
 		"name", "posting_date", "customer", "is_return",
 		"exempt_amount", "taxed_amount_15", "isv_15",
 		"taxed_amount_18", "isv_18", "discount_amount",
-		"rounded_total"
+		"grand_total", "rounded_total"
 	]
 
 	sales_invoices = frappe.get_all("Sales Invoice", fields=fields, filters=conditions, order_by="name")
