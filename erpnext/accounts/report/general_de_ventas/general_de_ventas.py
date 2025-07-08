@@ -19,7 +19,7 @@ def execute(filters=None):
 		{"fieldname": "isv_18%", "fieldtype": "Currency", "label": "ISV 18%", "width": 110},
 		{"fieldname": "discount_amount", "fieldtype": "Currency", "label": "Descuento", "width": 110},
 		{"fieldname": "monto_bruto", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
-		{"fieldname": "total", "fieldtype": "Currency", "label": "Total", "width": 110},  # calculado
+		{"fieldname": "grand_total", "fieldtype": "Currency", "label": "Total", "width": 110},  # calculado
 		{"fieldname": "total_rounded", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110}  # antes "Total Final"
 	]
 
@@ -69,7 +69,7 @@ def execute(filters=None):
 			sales.isv_18,
 			sales.discount_amount,
 			monto_bruto,
-			total,
+			sales.grand_total,
 			sales.rounded_total  # ahora es Total Redondeado
 		]
 		data.append(row)
