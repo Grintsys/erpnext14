@@ -18,7 +18,7 @@ def execute(filters=None):
 		{"fieldname": "isv_18%", "fieldtype": "Currency", "label": "ISV 18%", "width": 110},
 		{"fieldname": "discount_amount", "fieldtype": "Currency", "label": "Descuento", "width": 110},
 		{"fieldname": "monto_bruto", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
-		{"fieldname": "total", "fieldtype": "Currency", "label": "Total", "width": 110},
+		{"fieldname": "grand_total", "fieldtype": "Currency", "label": "Total", "width": 110},
 		{"fieldname": "total_rounded", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110},
 		{"fieldname": "cost", "fieldtype": "Currency", "label": "Costo", "width": 110},
 		{"fieldname": "utility", "fieldtype": "Currency", "label": "Utilidad", "width": 110},
@@ -31,7 +31,7 @@ def execute(filters=None):
 
 	sales_invoices = frappe.get_all(
 		"Sales Invoice",
-		fields=["name", "posting_date", "customer", "is_return", "exempt_amount", "taxed_amount_15", "isv_15", "taxed_amount_18", "isv_18", "discount_amount", "rounded_total", "grand_total"],
+		fields=["name", "posting_date", "customer", "is_return", "exempt_amount", "taxed_amount_15", "isv_15", "taxed_amount_18", "isv_18", "discount_amount", "grand_total", "rounded_total", "grand_total"],
 		filters=conditions,
 		order_by="name"
 	)
@@ -64,12 +64,12 @@ def execute(filters=None):
 		)
 
 		# MODIFICADO: calcular total con ISV incluido
-		total = (
-			flt(sales.exempt_amount)
-			+ flt(sales.taxed_amount_15) + flt(sales.isv_15)
-			+ flt(sales.taxed_amount_18) + flt(sales.isv_18)
-			- flt(sales.discount_amount)
-		)
+		#total = (
+		#	flt(sales.exempt_amount)
+		#	+ flt(sales.taxed_amount_15) + flt(sales.isv_15)
+		#	+ flt(sales.taxed_amount_18) + flt(sales.isv_18)
+		#	- flt(sales.discount_amount)
+		#)
 
 		# Calcular Utilidad y % Utilidad
 		utility = monto_bruto - cost
@@ -89,7 +89,7 @@ def execute(filters=None):
 			sales.isv_18,
 			sales.discount_amount,
 			monto_bruto,
-			total,
+			sales.grand_total,
 			sales.rounded_total,  # total_rounded
 			cost,
 			utility,
