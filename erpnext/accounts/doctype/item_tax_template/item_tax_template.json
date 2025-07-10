@@ -12,6 +12,8 @@
   "company",
   "column_break_3",
   "disabled",
+  "buying",
+  "selling",
   "section_break_5",
   "taxes"
  ],
@@ -53,10 +55,22 @@
   {
    "fieldname": "section_break_5",
    "fieldtype": "Section Break"
+  },
+  {
+   "default": "0",
+   "fieldname": "buying",
+   "fieldtype": "Check",
+   "label": "Buying"
+  },
+  {
+   "default": "0",
+   "fieldname": "selling",
+   "fieldtype": "Check",
+   "label": "Selling"
   }
  ],
  "links": [],
- "modified": "2022-01-18 21:11:23.105589",
+ "modified": "2025-07-10 15:53:01.151124",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "Item Tax Template",
