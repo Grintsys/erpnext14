@@ -143,25 +143,28 @@ class PurchaseInvoice(BuyingController):
 		self.exempt_amount = 0
 
 		for item in self.items:
-			tax_template = frappe.get_doc("Item Tax Template", item.item_tax_template)
-				
-			for taxitem in tax_template.taxes:
-				if(taxitem.tax_rate == 15):
-					# self.taxed_amount_15 += item.amount - (item.amount*(taxitem.tax_rate/100))
-					# self.isv_15 += item.amount*(taxitem.tax_rate/100)
+			item_all_data = frappe.get_doc("Item", item.item_code)
 
-					self.taxed_amount_15 += (item.amount + item.discount_amount)/1.15
-					self.isv_15 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.15)
+			for tax_detail in item_all_data.taxes:	
+				tax_template = frappe.get_doc("Item Tax Template", tax_detail.item_tax_template)			
+				for taxitem in tax_template.taxes:
+					if tax_template.buying:
+						if(taxitem.tax_rate == 15):
+							# self.taxed_amount_15 += item.amount - (item.amount*(taxitem.tax_rate/100))
+							# self.isv_15 += item.amount*(taxitem.tax_rate/100)
 
-				if(taxitem.tax_rate == 18):
-					# self.taxed_amount_18 += item.amount - (item.amount*(taxitem.tax_rate/100))
-					# self.isv_18 += item.amount*(taxitem.tax_rate/100)
+							self.taxed_amount_15 += (item.amount + item.discount_amount)/1.15
+							self.isv_15 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.15)
 
-					self.taxed_amount_18 += (item.amount+ item.discount_amount)/1.18
-					self.isv_18 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.18)
+						if(taxitem.tax_rate == 18):
+							# self.taxed_amount_18 += item.amount - (item.amount*(taxitem.tax_rate/100))
+							# self.isv_18 += item.amount*(taxitem.tax_rate/100)
 
-				if(taxitem.tax_rate == 0):
-					self.exempt_amount += item.amount
+							self.taxed_amount_18 += (item.amount+ item.discount_amount)/1.18
+							self.isv_18 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.18)
+
+						if(taxitem.tax_rate == 0):
+							self.exempt_amount += item.amount
 
 	def set_percentage_received(self):
 		total_billed_qty = 0.0
