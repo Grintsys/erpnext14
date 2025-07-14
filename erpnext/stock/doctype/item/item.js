@@ -508,6 +508,22 @@ $.extend(erpnext.item, {
 				},
 			};
 		});
+
+		frm.set_query("item_tax_template", "taxes", function (doc) {
+			return {
+				filters: [
+					["Item Tax Template", "selling", "=", 1],
+				],
+			}
+		});
+
+		frm.set_query("item_tax_template", "purchase_taxes", function (doc) {
+			return {
+				filters: [
+					["Item Tax Template", "buying", "=", 1],
+				],
+			}
+		});
 	},
 
 	make_dashboard: function (frm) {
