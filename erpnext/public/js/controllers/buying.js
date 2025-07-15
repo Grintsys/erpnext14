@@ -115,8 +115,30 @@ erpnext.buying.BuyingController = class BuyingController extends erpnext.Transac
 
 		if(this.frm.fields_dict["items"].grid.get_field('item_code')) {
 			this.frm.set_query("item_tax_template", "items", function(doc, cdt, cdn) {
-				return me.set_query_for_item_tax_template(doc, cdt, cdn)
+				return me.set_query_for_item_tax_template_buying(doc, cdt, cdn)
 			});
+		}
+	}
+
+	set_query_for_item_tax_template_buying(doc, cdt, cdn) {
+		var item = frappe.get_doc(cdt, cdn);
+		if(!item.item_code) {
+			return doc.company ? {filters: {company: doc.company}} : {};
+		} else {
+			let filters = {
+				'item_code': item.item_code,
+				'valid_from': ["<=", doc.transaction_date || doc.bill_date || doc.posting_date],
+				'item_group': item.item_group,
+			}
+
+			if (doc.tax_category)
+				filters['tax_category'] = doc.tax_category;
+			if (doc.company)
+				filters['company'] = doc.company;
+			return {
+				query: "erpnext.controllers.queries.get_tax_template_purchase",
+				filters: filters
+			}
 		}
 	}
 
