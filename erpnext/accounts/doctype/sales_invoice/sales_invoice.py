@@ -88,12 +88,20 @@ class SalesInvoice(SellingController):
 			self.indicator_color = "green"
 			self.indicator_title = _("Paid")
 
+	def validate_id_disable_rounded_total(self):
+		if self.is_pos:
+			if self.pos_profile:
+				pos = frappe.get_doc("POS Profile", self.pos_profile)
+				self.disable_rounded_total = pos.disable_rounded_total
+
 	def validate(self):
 		super().validate()
 		self.validate_auto_set_posting_time()
 
 		if not (self.is_pos or self.is_debit_note):
 			self.so_dn_required()
+		
+		self.validate_id_disable_rounded_total()
 
 		self.set_tax_withholding()
 
