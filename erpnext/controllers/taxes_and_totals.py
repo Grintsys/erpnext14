@@ -113,7 +113,12 @@ class calculate_taxes_and_totals:
 					item_group_taxes += item_group_doc.taxes or []
 					item_group = item_group_doc.parent_item_group
 
-				item_taxes = item_doc.taxes or []
+				item_taxes = []
+
+				if self.doc.get("doctype") == "Purchase Invoice":
+					item_taxes = item_doc.purchase_taxes
+				else:
+					item_taxes = item_doc.taxes
 
 				if not item_group_taxes and (not item_taxes):
 					# No validation if no taxes in item or item group

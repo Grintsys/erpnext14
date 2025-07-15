@@ -614,8 +614,12 @@ def get_item_tax_template(args, item, out):
 	}
 	"""
 	item_tax_template = None
-	if item.taxes:
-		item_tax_template = _get_item_tax_template(args, item.taxes, out)
+	if args.doctype == 'Purchase Invoice':
+		if item.purchase_taxes:
+			item_tax_template = _get_item_tax_template(args, item.purchase_taxes, out)
+	else:
+		if item.taxes:
+			item_tax_template = _get_item_tax_template(args, item.taxes, out)
 
 	if not item_tax_template:
 		item_group = item.item_group

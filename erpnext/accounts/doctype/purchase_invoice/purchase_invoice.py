@@ -145,7 +145,7 @@ class PurchaseInvoice(BuyingController):
 		for item in self.items:
 			item_all_data = frappe.get_doc("Item", item.item_code)
 
-			for tax_detail in item_all_data.taxes:	
+			for tax_detail in item_all_data.purchase_taxes:	
 				tax_template = frappe.get_doc("Item Tax Template", tax_detail.item_tax_template)			
 				for taxitem in tax_template.taxes:
 					if tax_template.buying:
