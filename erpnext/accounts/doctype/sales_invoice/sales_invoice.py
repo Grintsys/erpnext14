@@ -92,7 +92,11 @@ class SalesInvoice(SellingController):
 		if self.is_pos:
 			if self.pos_profile:
 				pos = frappe.get_doc("POS Profile", self.pos_profile)
-				self.disable_rounded_total = pos.disable_rounded_total
+				if pos.disable_rounded_total:
+					self.disable_rounded_total = pos.disable_rounded_total
+					total_sum = self.rounding_adjustment + self.grand_total
+					if total_sum == self.rounded_total:
+						self.outstanding_amount = 0
 
 	def validate(self):
 		super().validate()
@@ -750,6 +754,7 @@ class SalesInvoice(SellingController):
 		self.get_itemised_tax_info()
 
 	def on_update_after_submit(self):
+		self.validate_id_disable_rounded_total()
 		fields_to_check = [
 			"additional_discount_account",
 			"cash_bank_account",
