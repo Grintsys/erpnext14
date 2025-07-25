@@ -30,6 +30,7 @@
   "ignore_pricing_rule",
   "allow_rate_change",
   "allow_discount_change",
+  "allow_logout",
   "section_break_23",
   "item_groups",
   "column_break_25",
@@ -429,6 +430,12 @@
    "fieldname": "create_vale",
    "fieldtype": "Check",
    "label": "Crear Vale"
+  },
+  {
+   "default": "0",
+   "fieldname": "allow_logout",
+   "fieldtype": "Check",
+   "label": "Permitir Salir"
   }
  ],
  "icon": "icon-cog",
@@ -456,7 +463,7 @@
    "link_fieldname": "pos_profile"
   }
  ],
- "modified": "2025-06-30 17:11:12.773610",
+ "modified": "2025-07-24 18:53:42.168480",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "POS Profile",
