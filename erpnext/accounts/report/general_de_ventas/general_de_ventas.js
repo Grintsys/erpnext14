@@ -3,27 +3,40 @@
 /* eslint-disable */
 
 frappe.query_reports["General de ventas"] = {
-	"filters": [
-		{
-			fieldname:"company",
-			label: __("Compañia"),
-			fieldtype: "Link",
-			options: "Company",
-			reqd: 1
-		},
-		{
-			fieldname: "from_date",
-			label: __("Desde"),
-			fieldtype: "Date",
-			default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
-			reqd: 1
-		},
-		{
-			fieldname:"to_date",
-			label: __("Hasta"),
-			fieldtype: "Date",
-			default: frappe.datetime.get_today(),
-			reqd: 1
-		},
-	]
+  "filters": [
+    {
+      fieldname:"company",
+      label: __("Compañia"),
+      fieldtype: "Link",
+      options: "Company",
+      reqd: 1
+    },
+    {
+      fieldname: "from_date",
+      label: __("Desde"),
+      fieldtype: "Date",
+      default: frappe.datetime.add_months(frappe.datetime.get_today(), -1),
+      reqd: 1
+    },
+    {
+      fieldname:"to_date",
+      label: __("Hasta"),
+      fieldtype: "Date",
+      default: frappe.datetime.get_today(),
+      reqd: 1
+    },
+    // 👇 NUEVOS: filtros por hora
+    {
+      fieldname: "from_time",
+      label: __("Hora inicial"),
+      fieldtype: "Time",
+      default: "00:00:00"
+    },
+    {
+      fieldname: "to_time",
+      label: __("Hora final"),
+      fieldtype: "Time",
+      default: "23:59:59"
+    }
+  ]
 };
