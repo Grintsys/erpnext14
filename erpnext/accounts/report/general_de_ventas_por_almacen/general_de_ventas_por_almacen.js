@@ -25,5 +25,18 @@ frappe.query_reports["General de ventas por almacen"] = {
 			default: frappe.datetime.get_today(),
 			reqd: 1
 		},
+		    // 👇 NUEVOS: filtros por hora
+		{
+			fieldname: "from_time",
+			label: __("Hora inicial"),
+			fieldtype: "Time",
+			default: "00:00:00"
+		},
+		{
+			fieldname: "to_time",
+			label: __("Hora final"),
+			fieldtype: "Time",
+			default: "23:59:59"
+		}
 	]
 };

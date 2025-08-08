@@ -1,104 +1,125 @@
 from __future__ import unicode_literals
 import frappe
 from frappe.utils import flt
-from frappe import _
 
 def execute(filters=None):
-	if not filters: filters = {}
+    if not filters:
+        filters = {}
 
-	columns = [
-		{"fieldname": "warehouse", "fieldtype": "Link", "options": "Warehouse", "label": "Almacen", "width": 140},
-		{"fieldname": "type_document", "fieldtype": "Data", "label": "Tipo de documento", "width": 140},
-		{"fieldname": "total_exempt", "fieldtype": "Currency", "label": "Total Exento", "width": 110},
-		{"fieldname": "base_isv_15%", "fieldtype": "Currency", "label": "Base ISV 15%", "width": 110},
-		{"fieldname": "isv_15%", "fieldtype": "Currency", "label": "ISV 15%", "width": 110},
-		{"fieldname": "base_isv_18%", "fieldtype": "Currency", "label": "Base ISV 18%", "width": 110},
-		{"fieldname": "isv_18%", "fieldtype": "Currency", "label": "ISV 18%", "width": 110},
-		{"fieldname": "discount_amount", "fieldtype": "Currency", "label": "Descuento", "width": 110},
-		{"fieldname": "gross_amount", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
-		{"fieldname": "grand_total", "fieldtype": "Currency", "label": "Total", "width": 110},
-		{"fieldname": "total_rounded", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110},
-		{"fieldname": "cost", "fieldtype": "Currency", "label": "Costo", "width": 110},
-		{"fieldname": "utility", "fieldtype": "Currency", "label": "Utilidad", "width": 110},
-		{"fieldname": "utility_percentage", "fieldtype": "Percent", "label": "% Utilidad", "width": 110},
-	]
+    columns = [
+        {"fieldname": "warehouse", "fieldtype": "Link", "options": "Warehouse", "label": "Almacen", "width": 140},
+        {"fieldname": "type_document", "fieldtype": "Data", "label": "Tipo de documento", "width": 140},
+        {"fieldname": "total_exempt", "fieldtype": "Currency", "label": "Total Exento", "width": 110},
+        {"fieldname": "base_isv_15%", "fieldtype": "Currency", "label": "Base ISV 15%", "width": 110},
+        {"fieldname": "isv_15%", "fieldtype": "Currency", "label": "ISV 15%", "width": 110},
+        {"fieldname": "base_isv_18%", "fieldtype": "Currency", "label": "Base ISV 18%", "width": 110},
+        {"fieldname": "isv_18%", "fieldtype": "Currency", "label": "ISV 18%", "width": 110},
+        {"fieldname": "discount_amount", "fieldtype": "Currency", "label": "Descuento", "width": 110},
+        {"fieldname": "gross_amount", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
+        {"fieldname": "grand_total", "fieldtype": "Currency", "label": "Total", "width": 110},
+        {"fieldname": "total_rounded", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110},
+        {"fieldname": "cost", "fieldtype": "Currency", "label": "Costo", "width": 110},
+        {"fieldname": "utility", "fieldtype": "Currency", "label": "Utilidad", "width": 110},
+        {"fieldname": "utility_percentage", "fieldtype": "Percent", "label": "% Utilidad", "width": 110},
+    ]
 
-	data = []
-	warehouses = frappe.get_all("Warehouse", pluck="name")
+    # --- WHERE dinámico por fecha/hora/empresa ---
+    where = ["si.docstatus = 1"]
+    params = {}
 
-	for warehouse in warehouses:
-		row = add_row(filters, warehouse, "Factura de venta", 0)
-		if row and row[9] != 0:
-			data.append(row)
+    # Compañía
+    if filters.get("company"):
+        where.append("si.company = %(company)s")
+        params["company"] = filters["company"]
 
-		row_return = add_row(filters, warehouse, "Devolución", 1)
-		if row_return and row_return[9] != 0:
-			data.append(row_return)
+    # Fechas
+    if filters.get("from_date") and filters.get("to_date"):
+        where.append("si.posting_date BETWEEN %(from_date)s AND %(to_date)s")
+        params["from_date"] = filters["from_date"]
+        params["to_date"] = filters["to_date"]
 
-	return columns, data
+    # Horas (incluye cruce de medianoche)
+    from_time = filters.get("from_time") or None
+    to_time = filters.get("to_time") or None
+    if from_time and to_time:
+        if from_time <= to_time:
+            where.append("si.posting_time BETWEEN %(from_time)s AND %(to_time)s")
+        else:
+            where.append("(si.posting_time >= %(from_time)s OR si.posting_time <= %(to_time)s)")
+        params["from_time"] = from_time
+        params["to_time"] = to_time
 
-def add_row(filters, warehouse, type_document, is_return):
-	total_exempt = base_isv_15 = isv_15 = base_isv_18 = isv_18 = 0
-	discount_amount = grand_total = total_rounded = cost = utility = 0
+    where_sql = " AND ".join(where)
 
-	profiles = frappe.get_all("POS Profile", pluck="name", filters={"warehouse": warehouse})
+    # --- SQL: agrupar por almacén (desde POS Profile) y por is_return ---
+    rows = frappe.db.sql(
+        f"""
+        SELECT
+            pp.warehouse                              AS warehouse,
+            si.is_return                               AS is_return,
+            SUM(si.exempt_amount)                      AS total_exempt,
+            SUM(si.taxed_amount_15)                    AS base_isv_15,
+            SUM(si.isv_15)                             AS isv_15,
+            SUM(si.taxed_amount_18)                    AS base_isv_18,
+            SUM(si.isv_18)                             AS isv_18,
+            SUM(si.discount_amount)                    AS discount_amount,
+            SUM(si.grand_total)                        AS grand_total,
+            SUM(si.rounded_total)                      AS total_rounded,
+            COALESCE(SUM(sii.qty * sii.incoming_rate), 0) AS cost
+        FROM `tabSales Invoice` si
+        JOIN `tabPOS Profile` pp ON pp.name = si.pos_profile
+        LEFT JOIN `tabSales Invoice Item` sii ON sii.parent = si.name
+        WHERE {where_sql}
+        GROUP BY pp.warehouse, si.is_return
+        ORDER BY pp.warehouse, si.is_return
+        """,
+        params,
+        as_dict=True
+    )
 
-	for profile in profiles:
-		conditions = build_conditions(filters, profile, is_return)
-		sales_invoices = frappe.get_all("Sales Invoice", filters=conditions, fields=[
-			"name", "exempt_amount", "taxed_amount_15", "isv_15", "taxed_amount_18",
-			"isv_18", "discount_amount", "grand_total", "rounded_total"
-		])
+    # Armar filas finales y cálculos derivados
+    data = []
+    for r in rows:
+        warehouse = r.warehouse
+        type_document = "Devolución" if flt(r.is_return) == 1 else "Factura de venta"
 
-		for sale in sales_invoices:
-			items = frappe.get_all("Sales Invoice Item", filters={"parent": sale.name}, fields=["qty", "incoming_rate"])
-			for item in items:
-				cost += flt(item.qty) * flt(item.incoming_rate)
+        total_exempt = flt(r.total_exempt)
+        base_isv_15 = flt(r.base_isv_15)
+        isv_15 = flt(r.isv_15)
+        base_isv_18 = flt(r.base_isv_18)
+        isv_18 = flt(r.isv_18)
+        discount_amount = flt(r.discount_amount)
+        grand_total = flt(r.grand_total)
+        total_rounded = flt(r.total_rounded)
+        cost = flt(r.cost)
 
-			total_exempt += flt(sale.exempt_amount)
-			base_isv_15 += flt(sale.taxed_amount_15)
-			isv_15 += flt(sale.isv_15)
-			base_isv_18 += flt(sale.taxed_amount_18)
-			isv_18 += flt(sale.isv_18)
-			discount_amount += flt(sale.discount_amount)
-			grand_total += flt(sale.grand_total)
-			total_rounded += flt(sale.rounded_total)
+        # Monto bruto SIN impuestos
+        gross_amount = total_exempt + base_isv_15 + base_isv_18 - discount_amount
 
-	# monto bruto SIN impuestos
-	monto_bruto = flt(total_exempt) + flt(base_isv_15) + flt(base_isv_18) - flt(discount_amount)
+        # Utilidad / % Utilidad
+        utility = gross_amount - cost
+        utility_percentage = (utility * 100 / gross_amount) if gross_amount > 0 else 0
+        utility_percentage = max(0, min(utility_percentage, 100))
 
-	# total CON impuestos
-	utility = monto_bruto - flt(cost)
-	utility_percentage = (utility * 100 / monto_bruto) if monto_bruto > 0 else 0
-	utility_percentage = max(0, min(utility_percentage, 100))
+        # (opcional) imitar tu filtro anterior: solo mostrar filas con Total != 0
+        if grand_total == 0:
+            continue
 
-	return [
-		warehouse,
-		type_document,
-		total_exempt,
-		base_isv_15,
-		isv_15,
-		base_isv_18,
-		isv_18,
-		discount_amount,
-		monto_bruto,
-		grand_total,
-		total_rounded,
-		cost,
-		utility,
-		utility_percentage
-	]
+        data.append([
+            warehouse,
+            type_document,
+            total_exempt,
+            base_isv_15,
+            isv_15,
+            base_isv_18,
+            isv_18,
+            discount_amount,
+            gross_amount,
+            grand_total,
+            total_rounded,
+            cost,
+            utility,
+            utility_percentage
+        ])
 
-def build_conditions(filters, pos_profile, is_return):
-	conditions = {
-		"pos_profile": pos_profile,
-		"is_return": is_return,
-  		"docstatus": 1
-	}
-	if filters.get("from_date") and filters.get("to_date"):
-		conditions["posting_date"] = ["between", [filters["from_date"], filters["to_date"]]]
-	if filters.get("company"):
-		conditions["company"] = filters["company"]
-
-	return conditions
-
+    return columns, data
