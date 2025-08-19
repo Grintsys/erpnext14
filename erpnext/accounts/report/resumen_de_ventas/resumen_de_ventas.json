@@ -1,0 +1,17 @@
+{
+  "name": "Resumen de Ventas",
+  "doctype": "Report",
+  "ref_doctype": "Sales Invoice",
+  "report_type": "Script Report",
+  "is_standard": "Yes",
+  "module": "Accounts",
+  "disabled": 0,
+  "prepared_report": 0,
+  "disable_prepared_report": 1,
+  "add_total_row": 1,
+  "roles": [
+    {"role": "System Manager"},
+    {"role": "Accounts Manager"},
+    {"role": "Accounts User"}
+  ]
+}

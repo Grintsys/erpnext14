@@ -271,6 +271,12 @@
    "type": "Link"
   },
   {
+    "type": "report",
+    "label": "Ventas del día",
+    "link_to": "report/Ventas del día",
+    "is_public": 0
+  },
+  {
    "dependencies": "Sales Invoice",
    "hidden": 0,
    "is_query_report": 1,
@@ -510,6 +516,19 @@
     "only_for": "Accounts",
     "type": "Link"
   },
+  {
+    "dependencies": "Sales Invoice",
+    "hidden": 0,
+    "is_query_report": 1,
+    "label": "Resumen de Ventas",
+    "link_count": 0,
+    "link_to": "Resumen de Ventas",
+    "link_type": "Report",
+    "for_doctype": "Sales Invoice",
+    "onboard": 0,
+    "only_for": "Accounts",
+    "type": "Link"
+  },  
   {
     "dependencies": "Sales Invoice",
     "hidden": 0,
