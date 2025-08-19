@@ -63,7 +63,8 @@
   "security_section",
   "password_manager",
   "secure_mode",
-  "create_vale"
+  "create_vale",
+  "strict_search"
  ],
  "fields": [
   {
@@ -436,6 +437,12 @@
    "fieldname": "allow_logout",
    "fieldtype": "Check",
    "label": "Permitir Salir"
+  },
+  {
+   "default": "0",
+   "fieldname": "strict_search",
+   "fieldtype": "Check",
+   "label": "Busqueda Estricta"
   }
  ],
  "icon": "icon-cog",
@@ -463,7 +470,7 @@
    "link_fieldname": "pos_profile"
   }
  ],
- "modified": "2025-07-24 18:53:42.168480",
+ "modified": "2025-08-18 20:16:23.732526",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "POS Profile",
