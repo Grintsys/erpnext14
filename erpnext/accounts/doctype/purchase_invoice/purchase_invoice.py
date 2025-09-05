@@ -87,13 +87,10 @@ class PurchaseInvoice(BuyingController):
 		return self.on_hold and (not self.release_date or self.release_date > getdate(nowdate()))
 
 	def validate(self):
-		self.get_itemised_tax_info()
-		
 		if not self.is_opening:
 			self.is_opening = "No"
 
 		self.validate_posting_time()
-
 		super().validate()
 
 		if not self.is_return:
@@ -101,11 +98,9 @@ class PurchaseInvoice(BuyingController):
 			self.pr_required()
 			self.validate_supplier_invoice()
 
-		# validate cash purchase
 		if self.is_paid == 1:
 			self.validate_cash()
 
-		# validate service stop date to lie in between start and end date
 		validate_service_stop_date(self)
 
 		if self._action == "submit" and self.update_stock:
@@ -135,36 +130,168 @@ class PurchaseInvoice(BuyingController):
 		self.reset_default_field_value("set_from_warehouse", "items", "from_warehouse")
 		self.set_percentage_received()
 
+		# el motor de impuestos ya dejó item_wise_tax_detail listo
+		self.set_percentage_received()
+
+		# ERPNext ya calculó impuestos/totales
+		try:
+			self.calculate_taxes_and_totals()
+		except Exception:
+			pass
+		self.get_itemised_tax_info()
+
+	def before_submit(self):
+		try:
+			self.calculate_taxes_and_totals()
+		except Exception:
+			pass
+		self.get_itemised_tax_info()
+
+	# ===========================
+	# GRINTSYS v3.2: Totales 15/18/Exento con autodetección [rate, amount] / [amount, rate]
+	# ===========================
 	def get_itemised_tax_info(self):
-		self.taxed_amount_15 = 0
-		self.isv_15 = 0
-		self.taxed_amount_18 = 0
-		self.isv_18 = 0
-		self.exempt_amount = 0
+		import json
+		from frappe.utils import flt, cstr
 
-		for item in self.items:
-			item_all_data = frappe.get_doc("Item", item.item_code)
+		# reset
+		self.taxed_amount_15 = 0.0
+		self.isv_15 = 0.0
+		self.taxed_amount_18 = 0.0
+		self.isv_18 = 0.0
+		self.exempt_amount = 0.0
 
-			for tax_detail in item_all_data.purchase_taxes:	
-				tax_template = frappe.get_doc("Item Tax Template", tax_detail.item_tax_template)			
-				for taxitem in tax_template.taxes:
-					if tax_template.buying:
-						if(taxitem.tax_rate == 15):
-							# self.taxed_amount_15 += item.amount - (item.amount*(taxitem.tax_rate/100))
-							# self.isv_15 += item.amount*(taxitem.tax_rate/100)
+		# base neta total (moneda del doc)
+		total_net = sum(flt(getattr(it, "net_amount", 0.0)) for it in (self.items or []))
 
-							self.taxed_amount_15 += (item.amount + item.discount_amount)/1.15
-							self.isv_15 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.15)
+		# base por ítem para poder derivar tasa y validar orden
+		item_base = {}
+		for it in (self.items or []):
+			base = flt(getattr(it, "net_amount", 0.0))
+			for k in filter(None, [
+				it.item_code,
+				it.item_name,
+				f"{(it.item_code or '').strip()} - {(it.item_name or '').strip()}".strip(" -"),
+				cstr(getattr(it, "name", "")),
+			]):
+				item_base[k] = item_base.get(k, 0.0) + base
 
-						if(taxitem.tax_rate == 18):
-							# self.taxed_amount_18 += item.amount - (item.amount*(taxitem.tax_rate/100))
-							# self.isv_18 += item.amount*(taxitem.tax_rate/100)
+		def near(a, b, eps=1e-6): return abs(flt(a) - flt(b)) <= eps
 
-							self.taxed_amount_18 += (item.amount+ item.discount_amount)/1.18
-							self.isv_18 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.18)
+		base15 = tax15 = base18 = tax18 = 0.0
+		used_item_json = False
 
-						if(taxitem.tax_rate == 0):
-							self.exempt_amount += item.amount
+		# ---- intento A: usar disolución por ítem
+		for tax in (self.taxes or []):
+			raw = getattr(tax, "item_wise_tax_detail", None)
+			if not raw:
+				continue
+			try:
+				det = json.loads(raw)
+			except Exception:
+				continue
+			if not isinstance(det, dict) or not det:
+				continue
+
+			used_item_json = True
+			row_rate = flt(getattr(tax, "rate", 0.0))
+
+			for key, val in det.items():
+				# Normalizamos a (tax_amt, rate) sin importar el orden de la lista
+				tax_amt = 0.0
+				rate = 0.0
+
+				base_for_item = item_base.get(key, 0.0) or item_base.get(key.split(" - ")[0], 0.0)
+
+				if isinstance(val, (list, tuple)) and len(val) >= 2:
+					a = flt(val[0]); b = flt(val[1])
+
+					# Candidato 1: [amount, rate]
+					tax1, rate1 = a, b
+					# Candidato 2: [rate, amount]
+					tax2, rate2 = b, a
+
+					def score(tax_cand, rate_cand):
+						# score = distancia entre tax_cand y base*rate/100 (menor es mejor)
+						if base_for_item <= 0 or rate_cand <= 0 or rate_cand > 100:
+							return float("inf")
+						return abs(tax_cand - base_for_item * rate_cand / 100.0)
+
+					s1 = score(tax1, rate1)
+					s2 = score(tax2, rate2)
+
+					# Si alguno cuadra mejor con la base del ítem, lo usamos
+					if s2 < s1:
+						tax_amt, rate = tax2, rate2
+					else:
+						tax_amt, rate = tax1, rate1
+
+				elif isinstance(val, (list, tuple)) and len(val) == 1:
+					# solo un número → probablemente sea el impuesto; la tasa se deriva
+					tax_amt = flt(val[0])
+					rate = 0.0
+				else:
+					# valor simple → puede ser el impuesto
+					tax_amt = flt(val)
+					rate = 0.0
+
+				if tax_amt == 0:
+					continue
+
+				# Si no hay tasa, usamos la de la fila o derivamos por base
+				if rate <= 0:
+					rate = row_rate
+				if (rate <= 0) and (base_for_item > 0):
+					rate = (tax_amt / base_for_item) * 100.0
+				if rate <= 0:
+					continue
+
+				base_amt = tax_amt * 100.0 / rate
+				if near(rate, 15.0):
+					tax15 += tax_amt; base15 += base_amt
+				elif near(rate, 18.0):
+					tax18 += tax_amt; base18 += base_amt
+
+		# ---- intento B: si A no sirvió (o quedó todo en cero), usar el renglón
+		if not used_item_json or (base15 == 0 and base18 == 0 and tax15 == 0 and tax18 == 0):
+			for tax in (self.taxes or []):
+				if getattr(tax, "charge_type", "") == "Actual":
+					continue
+				if getattr(tax, "add_deduct_tax", "Add") != "Add":
+					continue
+				rate = flt(getattr(tax, "rate", 0.0))
+				if rate <= 0:
+					continue
+				tax_amt = flt(getattr(tax, "tax_amount_after_discount_amount", 0.0)) \
+						or flt(getattr(tax, "tax_amount", 0.0))
+				if tax_amt == 0:
+					continue
+				base_amt = tax_amt * 100.0 / rate
+				if near(rate, 15.0):
+					tax15 += tax_amt; base15 += base_amt
+				elif near(rate, 18.0):
+					tax18 += tax_amt; base18 += base_amt
+
+		# asigna
+		self.taxed_amount_15 = flt(base15)
+		self.isv_15          = flt(tax15)
+		self.taxed_amount_18 = flt(base18)
+		self.isv_18          = flt(tax18)
+
+		# exento = neto (ajustado por descuento adicional sobre neto) - bases gravadas
+		base_net = flt(total_net)
+		from frappe.utils import cstr as _c
+		if _c(getattr(self, "apply_discount_on", "")) == "Net Total":
+			base_net -= flt(getattr(self, "discount_amount", 0.0))
+		exempt = base_net - (flt(base15) + flt(base18))
+
+		# limpieza micro
+		def clean(x): x = flt(x); return 0.0 if abs(x) < 0.005 else x
+		self.taxed_amount_15 = clean(self.taxed_amount_15)
+		self.isv_15          = clean(self.isv_15)
+		self.taxed_amount_18 = clean(self.taxed_amount_18)
+		self.isv_18          = clean(self.isv_18)
+		self.exempt_amount   = clean(exempt if exempt > 0 else 0.0)
 
 	def set_percentage_received(self):
 		total_billed_qty = 0.0
