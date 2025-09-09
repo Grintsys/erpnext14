@@ -1,83 +1,92 @@
+# Copyright (c) 2025
 from __future__ import unicode_literals
 import frappe
 from frappe.utils import flt
-from frappe import _, msgprint
+from frappe import _
 
 def execute(filters=None):
-	if not filters: filters = {}
+    filters = filters or {}
 
-	columns = [
-		{"fieldname": "date", "fieldtype": "Date", "label": "Fecha", "width": 100},
-		{"fieldname": "warehouse", "fieldtype": "Linnk","options": "Warehouse", "label": "Almacén", "width": 150},
-		{"fieldname": "document", "fieldtype": "Link", "options": "Purchase Invoice", "label": "Documento", "width": 140},
-		{"fieldname": "provider", "fieldtype": "Link", "options": "Supplier", "label": "Proveedor", "width": 140},
-		{"fieldname": "monto_bruto", "fieldtype": "Currency", "label": "Monto Bruto", "width": 110},
-		{"fieldname": "isv_15%", "fieldtype": "Currency", "label": "ISV 15%", "width": 110},
-		{"fieldname": "isv_18%", "fieldtype": "Currency", "label": "ISV 18%", "width": 110},
-		{"fieldname": "grand_total", "fieldtype": "Currency", "label": "Total Neto", "width": 110},
-		{"fieldname": "rounded_total", "fieldtype": "Currency", "label": "Total Redondeado", "width": 110},
-  		{"fieldname": "debit", "fieldtype": "Currency", "label": "Total Contado", "width": 110},
-		{"fieldname": "credit%", "fieldtype": "Currency", "label": "Total Credito", "width": 110}
-	]
+    columns = [
+        {"fieldname": "date",          "fieldtype": "Date",   "label": _("Fecha"),             "width": 100},
+        {"fieldname": "warehouse",     "fieldtype": "Link",   "options": "Warehouse",          "label": _("Almacén"),          "width": 150},
+        {"fieldname": "document",      "fieldtype": "Link",   "options": "Purchase Invoice",   "label": _("Documento"),        "width": 140},
+        {"fieldname": "provider",      "fieldtype": "Link",   "options": "Supplier",           "label": _("Proveedor"),        "width": 160},
 
-	data = []
+        {"fieldname": "monto_bruto",   "fieldtype": "Currency","label": _("Monto Bruto"),      "width": 120},
+        {"fieldname": "isv_15",        "fieldtype": "Currency","label": _("ISV 15%"),          "width": 110},
+        {"fieldname": "isv_18",        "fieldtype": "Currency","label": _("ISV 18%"),          "width": 110},
+        {"fieldname": "grand_total",   "fieldtype": "Currency","label": _("Total Neto"),       "width": 120},
+        {"fieldname": "rounded_total", "fieldtype": "Currency","label": _("Total Redondeado"), "width": 130},
+        {"fieldname": "debit",         "fieldtype": "Currency","label": _("Total Contado"),    "width": 120},
+        {"fieldname": "credit",        "fieldtype": "Currency","label": _("Total Crédito"),    "width": 120},
+    ]
 
-	conditions = return_filters(filters)
- 
-	fields = [
-		"name", "posting_date", "supplier",
-		"exempt_amount", "isv_15","taxed_amount_15",
-		"isv_18","taxed_amount_18", "discount_amount",
-		"grand_total", "rounded_total","total_advance",
-		"outstanding_amount", "set_warehouse","disable_rounded_total"
-	]
+    data = []
 
-	purchase_invoces = frappe.get_all("Purchase Invoice", fields=fields, filters=conditions, order_by="name")
+    conditions = get_filters(filters)
 
-	for purchase in purchase_invoces:
+    fields = [
+        "name", "posting_date", "supplier",
+        "exempt_amount", "isv_15", "taxed_amount_15",
+        "isv_18", "taxed_amount_18", "discount_amount",
+        "grand_total", "rounded_total", "total_advance",
+        "outstanding_amount", "set_warehouse", "disable_rounded_total"
+    ]
 
-		# Calcular monto bruto
-		monto_bruto = (
-			flt(purchase.exempt_amount)
-			+ flt(purchase.taxed_amount_15)
-			+ flt(purchase.taxed_amount_18)
-			- flt(purchase.discount_amount)
-		)
+    invoices = frappe.get_all(
+        "Purchase Invoice",
+        fields=fields,
+        filters=conditions,
+        order_by="posting_date asc, name asc",
+    )
 
-		total_debit = 0
+    for pi in invoices:
+        # Monto Bruto = Exento + Base15 + Base18 - Descuento adicional
+        monto_bruto = (
+            flt(pi.exempt_amount)
+            + flt(pi.taxed_amount_15)
+            + flt(pi.taxed_amount_18)
+            - flt(pi.discount_amount)
+        )
 
-		if(purchase.disable_rounded_total):
-			total_debit = purchase.grand_total - purchase.outstanding_amount
-		else:
-			total_debit = purchase.rounded_total - purchase.outstanding_amount
+        # Total Contado (pagado) = Total - Pendiente
+        if pi.disable_rounded_total:
+            debit = flt(pi.grand_total) - flt(pi.outstanding_amount)
+        else:
+            debit = flt(pi.rounded_total) - flt(pi.outstanding_amount)
 
-		row = [
-			purchase.posting_date,
-			purchase.set_warehouse,
-			purchase.name,
-			purchase.supplier,
-			monto_bruto,
-			purchase.isv_15,
-			purchase.isv_18,
-			purchase.grand_total,
-			purchase.rounded_total,
-			total_debit,
-			purchase.outstanding_amount
-		]
-		data.append(row)
+        data.append({
+            "date":          pi.posting_date,
+            "warehouse":     pi.set_warehouse,
+            "document":      pi.name,
+            "provider":      pi.supplier,
 
-	return columns, data
+            "monto_bruto":   monto_bruto,
+            "isv_15":        flt(pi.isv_15),
+            "isv_18":        flt(pi.isv_18),
+            "grand_total":   flt(pi.grand_total),
+            "rounded_total": flt(pi.rounded_total),
+            "debit":         debit,
+            "credit":        flt(pi.outstanding_amount),
+        })
+
+    return columns, data
 
 
-def return_filters(filters):
-	conditions = {
-		"docstatus": 1  # Solo facturas validadas
-	}
+def get_filters(filters):
+    conditions = {"docstatus": 1}
 
-	if filters.get("from_date") and filters.get("to_date"):
-		conditions["posting_date"] = ["between", [filters["from_date"], filters["to_date"]]]
+    if filters.get("from_date") and filters.get("to_date"):
+        conditions["posting_date"] = ["between", [filters["from_date"], filters["to_date"]]]
 
-	if filters.get("company"):
-		conditions["company"] = filters["company"]
+    if filters.get("company"):
+        conditions["company"] = filters["company"]
 
-	return conditions
+    # opcionales (si decides añadir estos filtros en el .js)
+    if filters.get("warehouse"):
+        conditions["set_warehouse"] = filters["warehouse"]
+    if filters.get("supplier"):
+        conditions["supplier"] = filters["supplier"]
+
+    return conditions
