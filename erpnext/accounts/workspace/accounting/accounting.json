@@ -14,6 +14,7 @@
  "hide_custom": 0,
  "icon": "accounting",
  "idx": 0,
+ "is_hidden": 0,
  "label": "Accounting",
  "links": [
   {
@@ -271,12 +272,6 @@
    "type": "Link"
   },
   {
-    "type": "report",
-    "label": "Ventas del día",
-    "link_to": "report/Ventas del día",
-    "is_public": 0
-  },
-  {
    "dependencies": "Sales Invoice",
    "hidden": 0,
    "is_query_report": 1,
@@ -479,81 +474,59 @@
    "type": "Link"
   },
   {
-    "dependencies": "Sales Invoice",
-    "hidden": 0,
-    "is_query_report": 1,
-    "label": "General de ventas",
-    "link_count": 0,
-    "link_to": "General de ventas",
-    "link_type": "Report",
-    "onboard": 0,
-    "only_for": "Accounts",
-    "type": "Link"
+   "dependencies": "Sales Invoice",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "General de ventas",
+   "link_count": 0,
+   "link_to": "General de ventas",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   },
   {
-    "dependencies": "Sales Invoice",
-    "hidden": 0,
-    "is_query_report": 1,
-    "label": "General de ventas con costo y utilidad",
-    "link_count": 0,
-    "link_to": "General de ventas con costo y utilidad",
-    "link_type": "Report",
-    "for_doctype": "Sales Invoice",
-    "onboard": 0,
-    "only_for": "Accounts",
-    "type": "Link"
+   "dependencies": "Sales Invoice",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "General de ventas con costo y utilidad",
+   "link_count": 0,
+   "link_to": "General de ventas con costo y utilidad",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   },
   {
-    "dependencies": "Sales Invoice",
-    "hidden": 0,
-    "is_query_report": 1,
-    "label": "General de ventas por almacen",
-    "link_count": 0,
-    "link_to": "General de ventas por almacen",
-    "link_type": "Report",
-    "for_doctype": "Sales Invoice",
-    "onboard": 0,
-    "only_for": "Accounts",
-    "type": "Link"
+   "dependencies": "Sales Invoice",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "General de ventas por almacen",
+   "link_count": 0,
+   "link_to": "General de ventas por almacen",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   },
   {
-    "dependencies": "Sales Invoice",
-    "hidden": 0,
-    "is_query_report": 1,
-    "label": "Resumen de Ventas",
-    "link_count": 0,
-    "link_to": "Resumen de Ventas",
-    "link_type": "Report",
-    "for_doctype": "Sales Invoice",
-    "onboard": 0,
-    "only_for": "Accounts",
-    "type": "Link"
-  },  
-  {
-    "dependencies": "Sales Invoice",
-    "hidden": 0,
-    "is_query_report": 1,
-    "label": "Resumen diario",
-    "link_count": 0,
-    "link_to": "Resumen diario",
-    "link_type": "Report",
-    "for_doctype": "Sales Invoice",
-    "onboard": 0,
-    "only_for": "Accounts",
-    "type": "Link"
+   "dependencies": "Sales Invoice",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Resumen diario",
+   "link_count": 0,
+   "link_to": "Resumen diario",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   },
   {
-    "dependencies": "Sales Invoice",
-    "hidden": 0,
-    "is_query_report": 1,
-    "label": "Ventas del día",
-    "link_count": 0,
-    "link_to": "Ventas del día",
-    "link_type": "Report",
-    "for_doctype": "Sales Invoice",
-    "onboard": 0,
-    "only_for": "Accounts",
-    "type": "Link"
+   "dependencies": "Sales Invoice",
+   "hidden": 0,
+   "is_query_report": 1,
+   "label": "Ventas del d\u00eda",
+   "link_count": 0,
+   "link_to": "Ventas del d\u00eda",
+   "link_type": "Report",
+   "onboard": 0,
+   "type": "Link"
   },
   {
    "dependencies": "Address",
@@ -1166,7 +1139,7 @@
    "type": "Link"
   }
  ],
- "modified": "2023-05-30 13:23:29.316711",
+ "modified": "2025-09-10 22:28:26.779762",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "Accounting",
@@ -1177,7 +1150,7 @@
  "quick_lists": [],
  "restrict_to_domain": "",
  "roles": [],
- "sequence_id": 2.0,
+ "sequence_id": 3.0,
  "shortcuts": [
   {
    "label": "Chart of Accounts",

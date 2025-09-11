@@ -1,0 +1,78 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-09-10 19:25:51.307420",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "nombre_proyecto",
+  "direccion",
+  "ubicacion",
+  "cost_center"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "URB-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "nombre_proyecto",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Nombre de proyecto",
+   "reqd": 1
+  },
+  {
+   "fieldname": "direccion",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Direccion"
+  },
+  {
+   "fieldname": "ubicacion",
+   "fieldtype": "Geolocation",
+   "label": "Ubicacion"
+  },
+  {
+   "fieldname": "cost_center",
+   "fieldtype": "Link",
+   "label": "Centro de costo",
+   "options": "Cost Center"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-09-10 20:40:59.299608",
+ "modified_by": "Administrator",
+ "module": "Urbanizaciones",
+ "name": "Urbanizaciones",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "nombre_proyecto",
+ "track_changes": 1
+}

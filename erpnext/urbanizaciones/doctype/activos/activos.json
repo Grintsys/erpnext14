@@ -1,0 +1,120 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-09-10 20:34:29.017530",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "urbanizaciones",
+  "descripcion_lote",
+  "direccion",
+  "column_break_1",
+  "descripcion",
+  "precio",
+  "status",
+  "centro_de_costo",
+  "ubicacion_section",
+  "ubicacion"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "label": "Series",
+   "options": "LOT-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "urbanizaciones",
+   "fieldtype": "Link",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Urbanizacion",
+   "options": "Urbanizaciones",
+   "reqd": 1
+  },
+  {
+   "fieldname": "descripcion_lote",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "label": "Descripcion",
+   "reqd": 1
+  },
+  {
+   "fieldname": "direccion",
+   "fieldtype": "Data",
+   "label": "Direccion"
+  },
+  {
+   "fieldname": "ubicacion",
+   "fieldtype": "Geolocation",
+   "label": "Ubicacion"
+  },
+  {
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_filter": 1,
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Estatus",
+   "options": "\nDisponible\nReservado\nFinanciado\nRefinanciado\nVendido"
+  },
+  {
+   "fieldname": "centro_de_costo",
+   "fieldtype": "Link",
+   "label": "Centro de costo",
+   "options": "Cost Center"
+  },
+  {
+   "fieldname": "descripcion",
+   "fieldtype": "Data",
+   "label": "Descripcion Medidas"
+  },
+  {
+   "fieldname": "precio",
+   "fieldtype": "Currency",
+   "label": "Precio"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "ubicacion_section",
+   "fieldtype": "Section Break"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2025-09-10 20:52:43.419879",
+ "modified_by": "Administrator",
+ "module": "Urbanizaciones",
+ "name": "Activos",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "show_title_field_in_link": 1,
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "title_field": "descripcion_lote",
+ "track_changes": 1
+}
