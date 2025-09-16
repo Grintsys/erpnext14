@@ -8,15 +8,25 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
+  "section_break_1",
   "naming_series",
   "customer",
   "urbanizaciones",
-  "column_break_1",
   "activos",
+  "column_break_1",
   "fecha_inicio",
   "status",
-  "section_break_1",
-  "monto_contrato"
+  "section_break_2",
+  "monto_contrato",
+  "prima",
+  "capital_financiado",
+  "column_break_2",
+  "plazo_meses",
+  "interes_anual",
+  "vencimiento_cuota",
+  "mora_diaria",
+  "section_break_3",
+  "cuota_estimada"
  ],
  "fields": [
   {
@@ -73,18 +83,86 @@
   {
    "fieldname": "section_break_1",
    "fieldtype": "Section Break",
-   "label": "Par\u00e1metros financieros"
+   "label": "Datos"
   },
   {
    "fieldname": "monto_contrato",
    "fieldtype": "Currency",
    "label": "Monto del contrato",
    "reqd": 1
+  },
+  {
+   "fieldname": "prima",
+   "fieldtype": "Currency",
+   "label": "Prima",
+   "reqd": 1
+  },
+  {
+   "fieldname": "capital_financiado",
+   "fieldtype": "Currency",
+   "label": "Capital financiado",
+   "precision": "2",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "plazo_meses",
+   "fieldtype": "Int",
+   "label": "Plazo en meses",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fetch_from": "configuracion_urbanizacion.interes_anual",
+   "fieldname": "interes_anual",
+   "fieldtype": "Percent",
+   "label": "Interes anual",
+   "precision": "2",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "vencimiento_cuota",
+   "fieldtype": "Int",
+   "label": "Fecha de vencimiento",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "mora_diaria",
+   "fieldtype": "Percent",
+   "label": "Mora diaria",
+   "precision": "2",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break",
+   "label": "Par\u00e1metros financieros"
+  },
+  {
+   "fieldname": "section_break_3",
+   "fieldtype": "Section Break",
+   "label": "Resumen"
+  },
+  {
+   "description": "Cuota estimada sin seguro.",
+   "fieldname": "cuota_estimada",
+   "fieldtype": "Currency",
+   "label": "Cuota Estimada",
+   "precision": "2",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-14 00:28:01.867226",
+ "modified": "2025-09-15 20:03:46.378632",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Financiamientos",
