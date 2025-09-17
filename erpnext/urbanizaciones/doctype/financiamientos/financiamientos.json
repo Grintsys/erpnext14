@@ -12,21 +12,25 @@
   "naming_series",
   "customer",
   "urbanizaciones",
-  "activos",
   "column_break_1",
+  "activos",
   "fecha_inicio",
   "status",
   "section_break_2",
+  "configuracion_financiamiento",
   "monto_contrato",
   "prima",
   "capital_financiado",
   "column_break_2",
   "plazo_meses",
   "interes_anual",
-  "vencimiento_cuota",
+  "dia_vencimiento_cuota",
   "mora_diaria",
   "section_break_3",
-  "cuota_estimada"
+  "cuota_estimada",
+  "saldo_actual",
+  "column_break_3",
+  "fecha_vencimiento_cuota"
  ],
  "fields": [
   {
@@ -78,7 +82,8 @@
    "fieldname": "status",
    "fieldtype": "Select",
    "label": "Estado",
-   "options": "Borrador\nGenerado\nEn curso\nLiquidado\nCancelado"
+   "options": "Borrador\nActivo\nCancelado\nRefinanciado\nCompletado",
+   "read_only": 1
   },
   {
    "fieldname": "section_break_1",
@@ -117,7 +122,7 @@
   },
   {
    "default": "0",
-   "fetch_from": "configuracion_urbanizacion.interes_anual",
+   "fetch_from": "configuracion_financiamiento.interes_anual",
    "fieldname": "interes_anual",
    "fieldtype": "Percent",
    "label": "Interes anual",
@@ -126,14 +131,8 @@
    "reqd": 1
   },
   {
-   "fieldname": "vencimiento_cuota",
-   "fieldtype": "Int",
-   "label": "Fecha de vencimiento",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
    "default": "0",
+   "fetch_from": "configuracion_financiamiento.mora_diaria",
    "fieldname": "mora_diaria",
    "fieldtype": "Percent",
    "label": "Mora diaria",
@@ -155,14 +154,48 @@
    "description": "Cuota estimada sin seguro.",
    "fieldname": "cuota_estimada",
    "fieldtype": "Currency",
-   "label": "Cuota Estimada",
+   "label": "Cuota estimada",
    "precision": "2",
    "read_only": 1
+  },
+  {
+   "fieldname": "configuracion_financiamiento",
+   "fieldtype": "Link",
+   "label": "Configuracion de financiamiento",
+   "options": "Configuracion de Urbanizacion",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "saldo_actual",
+   "fieldtype": "Currency",
+   "label": "Saldo actual",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fetch_from": "configuracion_financiamiento.vencimiento_cuota",
+   "fieldname": "dia_vencimiento_cuota",
+   "fieldtype": "Int",
+   "label": "D\u00eda de vencimiento",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "fecha_vencimiento_cuota",
+   "fieldtype": "Date",
+   "label": "Pr\u00f3xima fecha de vencimiento",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-15 20:03:46.378632",
+ "modified": "2025-09-16 21:36:26.154221",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Financiamientos",
