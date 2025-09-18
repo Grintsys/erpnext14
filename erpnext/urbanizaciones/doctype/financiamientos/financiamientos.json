@@ -30,7 +30,9 @@
   "cuota_estimada",
   "saldo_actual",
   "column_break_3",
-  "fecha_vencimiento_cuota"
+  "fecha_vencimiento_cuota",
+  "section_break_4",
+  "button_1"
  ],
  "fields": [
   {
@@ -81,6 +83,7 @@
    "default": "Borrador",
    "fieldname": "status",
    "fieldtype": "Select",
+   "in_list_view": 1,
    "label": "Estado",
    "options": "Borrador\nActivo\nCancelado\nRefinanciado\nCompletado",
    "read_only": 1
@@ -169,6 +172,7 @@
    "default": "0",
    "fieldname": "saldo_actual",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Saldo actual",
    "precision": "2",
    "read_only": 1
@@ -185,17 +189,28 @@
   {
    "fieldname": "fecha_vencimiento_cuota",
    "fieldtype": "Date",
+   "in_list_view": 1,
    "label": "Pr\u00f3xima fecha de vencimiento",
    "read_only": 1
   },
   {
    "fieldname": "column_break_3",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_4",
+   "fieldtype": "Section Break",
+   "label": "Acciones"
+  },
+  {
+   "fieldname": "button_1",
+   "fieldtype": "Button",
+   "label": "Generar Cuotas"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-16 21:36:26.154221",
+ "modified": "2025-09-17 21:03:20.921557",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Financiamientos",
