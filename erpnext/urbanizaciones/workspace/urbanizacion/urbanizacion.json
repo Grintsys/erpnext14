@@ -35,7 +35,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Archivos principales",
-   "link_count": 2,
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -59,9 +59,19 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Financiamientos",
+   "link_count": 0,
+   "link_to": "Financiamientos",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2025-09-10 23:46:10.307273",
+ "modified": "2025-09-15 16:04:09.393991",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Urbanizacion",

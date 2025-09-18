@@ -1,20 +1,22 @@
 {
  "actions": [],
  "allow_rename": 1,
- "creation": "2025-09-10 21:53:54.461682",
+ "autoname": "naming_series:",
+ "creation": "2025-09-16 19:47:13.057816",
  "default_view": "List",
  "doctype": "DocType",
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "par\u00e1metros_tab",
+  "tab_break_1",
   "item_cuota",
   "interes_anual",
   "column_break_1",
   "item_mora",
   "mora_diaria",
   "column_break_2",
-  "vencimiento_cuota"
+  "vencimiento_cuota",
+  "naming_series"
  ],
  "fields": [
   {
@@ -59,18 +61,26 @@
    "fieldtype": "Column Break"
   },
   {
-   "fieldname": "par\u00e1metros_tab",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Series",
+   "options": "CONF-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tab_break_1",
    "fieldtype": "Tab Break",
    "label": "Par\u00e1metros"
   }
  ],
  "index_web_pages_for_search": 1,
- "issingle": 1,
  "links": [],
- "modified": "2025-09-10 22:17:26.073896",
+ "modified": "2025-09-16 20:35:34.482569",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Configuracion de Urbanizacion",
+ "naming_rule": "By \"Naming Series\" field",
  "owner": "Administrator",
  "permissions": [
   {
