@@ -1,0 +1,93 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2025-09-18 16:46:27.743792",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "numero_cuota",
+  "fecha_vencimiento_cuota",
+  "capital",
+  "intereses",
+  "total_currency",
+  "saldo_anterior",
+  "status",
+  "payment",
+  "notas"
+ ],
+ "fields": [
+  {
+   "fieldname": "numero_cuota",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Numero de cuota",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fecha_vencimiento_cuota",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Fecha de vencimiento de la cuota",
+   "reqd": 1
+  },
+  {
+   "fieldname": "capital",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Capital",
+   "reqd": 1
+  },
+  {
+   "fieldname": "intereses",
+   "fieldtype": "Currency",
+   "label": "Intereses",
+   "reqd": 1
+  },
+  {
+   "fieldname": "total_currency",
+   "fieldtype": "Currency",
+   "label": "Total cuota",
+   "reqd": 1
+  },
+  {
+   "fieldname": "saldo_anterior",
+   "fieldtype": "Currency",
+   "label": "Saldo anterior",
+   "reqd": 1
+  },
+  {
+   "default": "Pendiente",
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "label": "Estado de la cuota",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "payment",
+   "fieldtype": "Link",
+   "label": "Pago",
+   "options": "Payment Entry"
+  },
+  {
+   "fieldname": "notas",
+   "fieldtype": "Small Text",
+   "label": "Notas"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2025-09-22 16:45:21.826941",
+ "modified_by": "Administrator",
+ "module": "Urbanizaciones",
+ "name": "Cuota de financiamiento",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
