@@ -24,23 +24,37 @@ frappe.ui.form.on('Financiamientos', {
                 // prevent double click immediately
                 frm.__btn_generar.prop('disabled', true);
 
-                // call server to generate child table rows
-                frappe.call({
-                    // server method path - adjust if your python module is different
-                    method: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.generar_cuotas',
-                    args: { docname: frm.doc.name },
-                }).then(() => {
-                    frm.reload_doc();
-                    frappe.show_alert({ message: __('Cuotas generadas'), indicator: 'green' });
-                    // mark as generated to avoid duplicate generation
-                    frm.__cuotas_generadas = true;
-                    // keep button disabled
-                    if (frm.__btn_generar) frm.__btn_generar.prop('disabled', true);
-                }).catch(() => {
-                    frappe.msgprint(__('Error generando cuotas'));
-                    // re-evaluate to allow retry
-                    toggle_generar_button(frm);
-                });
+                const call_generate = () => {
+                    frappe.call({
+                        // server method path - adjust if your python module is different
+                        method: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.generar_cuotas',
+                        args: { docname: frm.doc.name },
+                    }).then(() => {
+                        frm.reload_doc();
+                        frappe.show_alert({ message: __('Cuotas generadas'), indicator: 'green' });
+                        // mark as generated to avoid duplicate generation
+                        frm.__cuotas_generadas = true;
+                        // keep button disabled
+                        if (frm.__btn_generar) frm.__btn_generar.prop('disabled', true);
+                    }).catch((err) => {
+                        console.error(err);
+                        frappe.msgprint(__('Error generando cuotas'));
+                        // re-evaluate to allow retry
+                        toggle_generar_button(frm);
+                    });
+                };
+
+                // If the document is new or has unsaved changes, save it first so it exists in DB.
+                if (frm.is_new() || frm.is_dirty()) {
+                    frm.save().then(() => {
+                        call_generate();
+                    }).catch(() => {
+                        // save failed or was cancelled -> re-evaluate button state
+                        toggle_generar_button(frm);
+                    });
+                } else {
+                    call_generate();
+                }
             });
         }
 

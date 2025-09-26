@@ -7,6 +7,15 @@ from frappe.model.document import Document
 from frappe.utils import getdate, add_months
 import calendar
 
+STATUS_CUOTA = [
+    "Pendiente",
+    "Pagada",
+    "Abono a capital"
+    "Vencida",
+    "Anulada",
+    "Refinanciada",
+]
+
 class Financiamientos(Document):
     pass
 
@@ -38,9 +47,11 @@ def generar_cuotas(docname):
     except (ValueError, TypeError):
         dia_venc = None
 
-    cuota = float(doc.get('cuota_estimada') or 0.0)
+    cuota_mensual = float(doc.get('cuota_estimada') or 0.0)
     capital_total = float(doc.get('capital_financiado') or 0.0)
-    per_cuota = round(capital_total / int(plazo), 2) if capital_total and int(plazo) > 0 else 0.0
+    interes_mensual = float(doc.get('interes_anual') or 0.0) / 12 / 100  # convertir a decimal mensual
+    intereses = capital_total * interes_mensual
+    capital = cuota_mensual - intereses
 
     for i in range(1, int(plazo) + 1):
         # calcular fecha de vencimiento: partir de fecha_inicio y sumar i meses
@@ -61,11 +72,18 @@ def generar_cuotas(docname):
             'doctype': child_doctype,
             'numero_cuota': i,
             'fecha_vencimiento_cuota': fecha_venc_str,
-            'capital': 0.0,
-            'interes': 0.0,
-            'total': 0.0
+            'capital': capital,
+            'intereses': intereses,
+            'total_cuota': cuota_mensual,
+            'saldo_anterior': capital_total,
+            'saldo': capital_total - capital,
+            'status': STATUS_CUOTA[0],  # Pendiente
         }
         doc.append(child_fieldname, row)
+
+        capital_total -= capital
+        intereses = capital_total * interes_mensual
+        capital = cuota_mensual - intereses
 
     # guardar y devolver
     doc.save(ignore_permissions=True)

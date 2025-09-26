@@ -11,8 +11,9 @@
   "fecha_vencimiento_cuota",
   "capital",
   "intereses",
-  "total_currency",
+  "total_cuota",
   "saldo_anterior",
+  "saldo",
   "status",
   "payment",
   "notas"
@@ -46,12 +47,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "total_currency",
-   "fieldtype": "Currency",
-   "label": "Total cuota",
-   "reqd": 1
-  },
-  {
    "fieldname": "saldo_anterior",
    "fieldtype": "Currency",
    "label": "Saldo anterior",
@@ -75,12 +70,24 @@
    "fieldname": "notas",
    "fieldtype": "Small Text",
    "label": "Notas"
+  },
+  {
+   "fieldname": "total_cuota",
+   "fieldtype": "Currency",
+   "label": "Total cuota",
+   "reqd": 1
+  },
+  {
+   "fieldname": "saldo",
+   "fieldtype": "Currency",
+   "label": "Saldo",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-09-22 16:45:21.826941",
+ "modified": "2025-09-25 22:45:47.382452",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Cuota de financiamiento",
