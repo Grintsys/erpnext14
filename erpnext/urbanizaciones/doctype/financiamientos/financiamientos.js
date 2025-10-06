@@ -9,24 +9,37 @@ frappe.ui.form.on('Financiamientos', {
         calculate_cuota_estimada(frm);
         calculate_proxima_fecha(frm);
         calculate_saldo_actual(frm);
-
-        // Ensure button state is evaluated on load
-        if (typeof toggle_generar_button === 'function') {
-            toggle_generar_button(frm);
-        }
     },
 
     // add refresh to create the button and manage its state
     refresh: function(frm) {
-        // create the button once
+        // create the button once (always enabled)
         if (!frm.__btn_generar) {
             frm.__btn_generar = frm.add_custom_button(__('Generar cuotas'), function() {
+                // NOTE: button always enabled. If required data is missing, do nothing.
+                const required_fields = [
+                    'monto_contrato',
+                    'prima',
+                    'interes_anual',
+                    'plazo_meses',
+                    'fecha_inicio'
+                ];
+
+                const allFilled = required_fields.every(fn => {
+                    const v = frm.doc[fn];
+                    return v !== undefined && v !== null && v !== '' && !(typeof v === 'number' && isNaN(v));
+                });
+
+                // If basic required fields are not present, do nothing (silent)
+                if (!allFilled) {
+                    return;
+                }
+
                 // prevent double click immediately
                 frm.__btn_generar.prop('disabled', true);
 
                 const call_generate = () => {
                     frappe.call({
-                        // server method path - adjust if your python module is different
                         method: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.generar_cuotas',
                         args: { docname: frm.doc.name },
                     }).then(() => {
@@ -34,13 +47,12 @@ frappe.ui.form.on('Financiamientos', {
                         frappe.show_alert({ message: __('Cuotas generadas'), indicator: 'green' });
                         // mark as generated to avoid duplicate generation
                         frm.__cuotas_generadas = true;
-                        // keep button disabled
                         if (frm.__btn_generar) frm.__btn_generar.prop('disabled', true);
                     }).catch((err) => {
                         console.error(err);
                         frappe.msgprint(__('Error generando cuotas'));
-                        // re-evaluate to allow retry
-                        toggle_generar_button(frm);
+                        // re-enable button on error
+                        if (frm.__btn_generar) frm.__btn_generar.prop('disabled', false);
                     });
                 };
 
@@ -49,62 +61,54 @@ frappe.ui.form.on('Financiamientos', {
                     frm.save().then(() => {
                         call_generate();
                     }).catch(() => {
-                        // save failed or was cancelled -> re-evaluate button state
-                        toggle_generar_button(frm);
+                        // save failed or was cancelled -> re-enable button
+                        if (frm.__btn_generar) frm.__btn_generar.prop('disabled', false);
                     });
                 } else {
                     call_generate();
                 }
             });
-        }
 
-        // evaluate button enabled/disabled state on refresh
-        toggle_generar_button(frm);
+            // ensure custom button starts enabled
+            frm.__btn_generar.prop('disabled', false);
+        }
     },
 
     monto_contrato: function(frm)
     {
         calculate_capital_financiero(frm);
-        calculate_cuota_estimada(frm);
-        // re-evaluate button state
-        toggle_generar_button(frm);
+        calculate_cuota_estimada(frm);        
     },
 
     prima: function(frm)
     {
         calculate_capital_financiero(frm);
         calculate_cuota_estimada(frm);
-        toggle_generar_button(frm);
     },
 
     interes_anual: function(frm)
     {
         calculate_cuota_estimada(frm);
-        toggle_generar_button(frm);
     },
 
     plazo_meses: function(frm)
     {
         calculate_cuota_estimada(frm);
-        toggle_generar_button(frm);
     },
 
     fecha_inicio: function(frm)
     {
         calculate_proxima_fecha(frm);
-        toggle_generar_button(frm);
     },
 
     dia_vencimiento_cuota: function(frm)
     {
         calculate_proxima_fecha(frm);
-        toggle_generar_button(frm);
     },
 
     capital_financiado: function(frm)
     {
-        calculate_saldo_actual(frm);
-        toggle_generar_button(frm);
+        calculate_saldo_actual(frm);        
     }
 });
 
@@ -166,36 +170,4 @@ function calculate_saldo_actual(frm)
 {
     // Todo: Hacer el calculo correspondiente al capital a medida se pagan las cuotas
     frm.set_value('saldo_actual', frm.doc.capital_financiado);
-}
-
-// Helper: enable the "Generar cuotas" button only when required fields are present
-function toggle_generar_button(frm) {
-    // if button was already used to generate cuotas, keep it disabled
-    if (frm.__cuotas_generadas) {
-        if (frm.__btn_generar) frm.__btn_generar.prop('disabled', true);
-        return;
-    }
-
-    // fieldnames required to allow generation - adjust as needed
-    const required_fields = [
-        'monto_contrato',
-        'prima',
-        'interes_anual',
-        'plazo_meses',
-        'fecha_inicio'
-    ];
-
-    const allFilled = required_fields.every(fn => {
-        const v = frm.doc[fn];
-        return v !== undefined && v !== null && v !== '' && !(typeof v === 'number' && isNaN(v));
-    });
-
-    const plazo_ok = Number(frm.doc.plazo_meses) > 0;
-    const capital_ok = Number(frm.doc.capital_financiado) > 0;
-
-    const enabled = allFilled && plazo_ok && capital_ok;
-
-    if (frm.__btn_generar) {
-        frm.__btn_generar.prop('disabled', !enabled);
-    }
 }
