@@ -18,11 +18,18 @@ frappe.ui.form.on('Financiamientos', {
             frm.__btn_generar = frm.add_custom_button(__('Generar cuotas'), function() {
                 // NOTE: button always enabled. If required data is missing, do nothing.
                 const required_fields = [
+                    'customer',
+                    'urbanizaciones',
+                    'activos',
+                    'fecha_inicio',
                     'monto_contrato',
+                    'configuracion_financiamiento',
                     'prima',
-                    'interes_anual',
+                    'capital_financiado',
                     'plazo_meses',
-                    'fecha_inicio'
+                    'interes_anual',
+                    'dia_vencimiento_cuota',
+                    'mora_diaria',
                 ];
 
                 const allFilled = required_fields.every(fn => {
@@ -32,6 +39,7 @@ frappe.ui.form.on('Financiamientos', {
 
                 // If basic required fields are not present, do nothing (silent)
                 if (!allFilled) {
+                    frappe.show_alert({ message: __('Complete todos los campos requeridos para generar las cuotas'), indicator: 'red' });
                     return;
                 }
 

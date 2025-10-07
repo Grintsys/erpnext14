@@ -6,15 +6,56 @@ from frappe import _
 from frappe.model.document import Document
 from frappe.utils import getdate, add_months
 import calendar
+import math
 
 STATUS_CUOTA = [
     "Pendiente",
     "Pagada",
-    "Abono a capital"
+    "Abono a capital",
     "Vencida",
     "Anulada",
     "Refinanciada",
 ]
+
+# Mapea fieldname -> etiqueta para mensajes amigables (ajusta si quieres otros labels)
+REQUIRED_FIELDS = {
+    "naming_series": "Series",
+    "customer": "Cliente",
+    "urbanizaciones": "Urbanización",
+    "activos": "Activo",
+    "fecha_inicio": "Fecha de inicio",
+    "monto_contrato": "Monto del contrato",
+    "configuracion_financiamiento": "Configuración de financiamiento",
+    "prima": "Prima",
+    "capital_financiado": "Capital financiado",
+    "plazo_meses": "Plazo en meses",
+    "interes_anual": "Interés anual",
+    "mora_diaria": "Mora diaria",
+    "dia_vencimiento_cuota": "Día de vencimiento",
+}
+
+def _is_filled(value):
+    """Consider 0 valid. Only None, empty string or NaN are treated as empty."""
+    if value is None:
+        return False
+    if isinstance(value, str) and value.strip() == "":
+        return False
+    if isinstance(value, float) and math.isnan(value):
+        return False
+    return True
+
+def validate_required_fields(doc):
+    """
+    Valida en servidor que los campos marcados como 'reqd' en financiamientos.json
+    estén presentes. Lanza frappe.ValidationError (frappe.throw) con la lista de faltantes.
+    """
+    missing = []
+    for fieldname, label in REQUIRED_FIELDS.items():
+        val = doc.get(fieldname)
+        if not _is_filled(val):
+            missing.append(label)
+    if missing:
+        frappe.throw(_("Faltan campos requeridos: {0}").format(", ".join(missing)))
 
 class Financiamientos(Document):
     pass
@@ -26,7 +67,13 @@ def generar_cuotas(docname):
     Convierte correctamente la fecha de vencimiento desde string a fecha (YYYY-MM-DD).
     """
     doc = frappe.get_doc('Financiamientos', docname)
+
+    # Validación server-side de campos requeridos (según financiamientos.json)
+    validate_required_fields(doc)
+
     plazo = doc.get('plazo_meses') or doc.get('plazo')
+    estado_financiamiento = doc.get('status')
+    
     if not plazo or int(plazo) <= 0:
         frappe.throw(_("El campo 'plazo_meses' debe estar definido y ser mayor que 0"))
 
@@ -84,6 +131,11 @@ def generar_cuotas(docname):
         capital_total -= capital
         intereses = capital_total * interes_mensual
         capital = cuota_mensual - intereses
+
+    
+    # actualizar estado del financiamiento
+    if estado_financiamiento == 'Borrador':
+        doc.status = 'Activo'
 
     # guardar y devolver
     doc.save(ignore_permissions=True)
