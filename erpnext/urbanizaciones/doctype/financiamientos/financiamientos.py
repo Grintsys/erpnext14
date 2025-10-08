@@ -7,14 +7,14 @@ from frappe.model.document import Document
 from frappe.utils import getdate, add_months
 import calendar
 import math
+from decimal import Decimal, getcontext, ROUND_HALF_UP
 
 STATUS_CUOTA = [
     "Pendiente",
-    "Pagada",
+    "Refinanciado",
+    "Pagado",
+    "Cancelado",
     "Abono a capital",
-    "Vencida",
-    "Anulada",
-    "Refinanciada",
 ]
 
 # Mapea fieldname -> etiqueta para mensajes amigables (ajusta si quieres otros labels)
@@ -94,43 +94,64 @@ def generar_cuotas(docname):
     except (ValueError, TypeError):
         dia_venc = None
 
-    cuota_mensual = float(doc.get('cuota_estimada') or 0.0)
-    capital_total = float(doc.get('capital_financiado') or 0.0)
-    interes_mensual = float(doc.get('interes_anual') or 0.0) / 12 / 100  # convertir a decimal mensual
-    intereses = capital_total * interes_mensual
-    capital = cuota_mensual - intereses
+    # Use Decimal for monetary calculations to avoid floating point rounding issues
+    getcontext().prec = 28
+    CENT = Decimal('0.01')
 
-    for i in range(1, int(plazo) + 1):
+    capital_total = Decimal(str(doc.get('capital_financiado') or 0))
+    annual_interest = Decimal(str(doc.get('interes_anual') or 0))
+    n = int(plazo)
+
+    # mensual interest rate as Decimal (e.g., 12% -> 0.01 per month)
+    r = (annual_interest / Decimal('100')) / Decimal('12') if annual_interest != 0 else Decimal('0')
+
+    # Calculate monthly payment (annuity) with Decimal
+    if r == 0:
+        payment = (capital_total / n).quantize(CENT, rounding=ROUND_HALF_UP) if n > 0 else Decimal('0.00')
+    else:
+        # payment = r * pv / (1 - (1 + r) ** -n)
+        payment = (r * capital_total / (Decimal('1') - (Decimal('1') + r) ** (Decimal(-n)))).quantize(CENT, rounding=ROUND_HALF_UP)
+
+    balance = capital_total
+
+    for i in range(1, n + 1):
+        # calculate interest and principal
+        interest = (balance * r).quantize(CENT, rounding=ROUND_HALF_UP)
+        principal = (payment - interest).quantize(CENT, rounding=ROUND_HALF_UP)
+
+        # On the last installment, adjust principal/payment to clear the remaining balance
+        if i == n:
+            principal = balance
+            payment = (principal + interest).quantize(CENT, rounding=ROUND_HALF_UP)
+
+        prev_balance = balance
+        balance = (balance - principal).quantize(CENT, rounding=ROUND_HALF_UP)
+
         # calcular fecha de vencimiento: partir de fecha_inicio y sumar i meses
         if fecha_inicio:
             base = getdate(fecha_inicio)
-            # primera cuota = +1 mes, segunda = +2, ... (ajusta si quieres incluir mes 0)
             venc = add_months(base, i)
             if dia_venc:
-                # asegurar día válido para el mes
                 last_day = calendar.monthrange(venc.year, venc.month)[1]
                 day = min(dia_venc, last_day)
                 venc = venc.replace(day=day)
-            fecha_venc_str = venc.strftime('%Y-%m-%d')
+            fecha_venc = venc
         else:
-            fecha_venc_str = None
+            fecha_venc = None
 
         row = {
             'doctype': child_doctype,
             'numero_cuota': i,
-            'fecha_vencimiento_cuota': fecha_venc_str,
-            'capital': capital,
-            'intereses': intereses,
-            'total_cuota': cuota_mensual,
-            'saldo_anterior': capital_total,
-            'saldo': capital_total - capital,
+            # store as date object (Frappe will format as YYYY-MM-DD)
+            'fecha_vencimiento_cuota': fecha_venc,
+            'capital': float(principal),
+            'intereses': float(interest),
+            'total_cuota': float(payment),
+            'saldo_anterior': float(prev_balance),
+            'saldo': float(balance),
             'status': STATUS_CUOTA[0],  # Pendiente
         }
         doc.append(child_fieldname, row)
-
-        capital_total -= capital
-        intereses = capital_total * interes_mensual
-        capital = cuota_mensual - intereses
 
     
     # actualizar estado del financiamiento
