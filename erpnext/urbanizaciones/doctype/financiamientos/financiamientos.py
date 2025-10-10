@@ -105,24 +105,32 @@ def generar_cuotas(docname):
     # mensual interest rate as Decimal (e.g., 12% -> 0.01 per month)
     r = (annual_interest / Decimal('100')) / Decimal('12') if annual_interest != 0 else Decimal('0')
 
-    # Calculate monthly payment (annuity) with Decimal
-    if r == 0:
-        payment = (capital_total / n).quantize(CENT, rounding=ROUND_HALF_UP) if n > 0 else Decimal('0.00')
+    # Calculate monthly payment (annuity) with Decimal and keep it fixed
+    if n > 0:
+        if r == 0:
+            monthly_payment = (capital_total / n).quantize(CENT, rounding=ROUND_HALF_UP)
+        else:
+            # monthly_payment = r * pv / (1 - (1 + r) ** -n)
+            monthly_payment = (r * capital_total / (Decimal('1') - (Decimal('1') + r) ** (Decimal(-n)))).quantize(CENT, rounding=ROUND_HALF_UP)
     else:
-        # payment = r * pv / (1 - (1 + r) ** -n)
-        payment = (r * capital_total / (Decimal('1') - (Decimal('1') + r) ** (Decimal(-n)))).quantize(CENT, rounding=ROUND_HALF_UP)
+        monthly_payment = Decimal('0.00')
 
     balance = capital_total
 
     for i in range(1, n + 1):
-        # calculate interest and principal
+        # calculate interest for this period
         interest = (balance * r).quantize(CENT, rounding=ROUND_HALF_UP)
-        principal = (payment - interest).quantize(CENT, rounding=ROUND_HALF_UP)
+
+        # provisional principal is payment - interest
+        principal = (monthly_payment - interest).quantize(CENT, rounding=ROUND_HALF_UP)
 
         # On the last installment, adjust principal/payment to clear the remaining balance
         if i == n:
             principal = balance
-            payment = (principal + interest).quantize(CENT, rounding=ROUND_HALF_UP)
+            last_payment = (principal + interest).quantize(CENT, rounding=ROUND_HALF_UP)
+            this_payment = last_payment
+        else:
+            this_payment = monthly_payment
 
         prev_balance = balance
         balance = (balance - principal).quantize(CENT, rounding=ROUND_HALF_UP)
@@ -146,7 +154,7 @@ def generar_cuotas(docname):
             'fecha_vencimiento_cuota': fecha_venc,
             'capital': float(principal),
             'intereses': float(interest),
-            'total_cuota': float(payment),
+            'total_cuota': float(this_payment),
             'saldo_anterior': float(prev_balance),
             'saldo': float(balance),
             'status': STATUS_CUOTA[0],  # Pendiente
