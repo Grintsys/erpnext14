@@ -5,8 +5,21 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 
-
 class CancelarFinanciamiento(Document):
+	def before_save(self):
+		"""
+		Validate that linked Financiamientos is 'Activo' before allowing save.
+		If not active, prevent save and inform the user.
+		"""
+		financ_name = getattr(self, 'financiamientos', None)
+		if not financ_name:
+			return
+
+		status = frappe.db.get_value('Financiamientos', financ_name, 'status')
+		if (status or '').strip() != 'Activo':
+			frappe.msgprint(_('El financiamiento {0} no está activo. No se guardará el documento.').format(financ_name))
+			frappe.throw(_('El financiamiento no está activo'))
+
 	def on_submit(self):
 		"""
 		When this Cancelar Financiamiento is submitted, perform the cancel
@@ -22,29 +35,10 @@ class CancelarFinanciamiento(Document):
 			# fetch current status to decide whether to update parent status
 			current_status = frappe.db.get_value('Financiamientos', financ_name, 'status')
 
-			# If the financiamiento is submitted, try to cancel it first so we
-			# can modify its data (cancel runs its own hooks)
-			financ_doc = frappe.get_doc('Financiamientos', financ_name)
-			if getattr(financ_doc, 'docstatus', 0) == 1:
-				try:
-					financ_doc.cancel()
-				except Exception as cancel_err:
-					frappe.log_error(frappe.get_traceback(), 'CancelarFinanciamiento.cancel_failed')
-					frappe.throw(_('No se pudo cancelar el financiamiento antes de actualizar: {0}').format(str(cancel_err)))
-
-			# After attempting cancellation, re-check docstatus
-			docstatus_parent = frappe.db.get_value('Financiamientos', financ_name, 'docstatus')
-
 			# Only change parent status to 'Cancelado' if it's currently 'Activo'
 			if (current_status or '').strip() == 'Activo':
-				if docstatus_parent == 2:
-					# parent is cancelled; update status via DB to avoid "Cannot edit cancelled document"
-					frappe.db.set_value('Financiamientos', financ_name, 'status', 'Cancelado')
-				else:
-					# safe to update via Document
-					financ = frappe.get_doc('Financiamientos', financ_name)
-					financ.status = 'Cancelado'
-					financ.save(ignore_permissions=True)
+				# update via db
+				frappe.db.set_value('Financiamientos', financ_name, 'status', 'Cancelado')
 
 			# update child cuotas statuses where Pendiente -> Cancelado
 			frappe.db.sql(
@@ -66,7 +60,6 @@ class CancelarFinanciamiento(Document):
 					frappe.db.set_value('Cancelar Financiamiento', self.name, 'status', latest_status)
 			except Exception:
 				frappe.log_error(frappe.get_traceback(), 'CancelarFinanciamiento.sync_status')
-
 		except Exception as e:
 			# ensure DB transaction is rolled back explicitly and prevent submit
 			try:
