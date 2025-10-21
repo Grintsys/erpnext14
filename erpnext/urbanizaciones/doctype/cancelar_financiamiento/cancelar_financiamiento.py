@@ -31,6 +31,10 @@ class CancelarFinanciamiento(Document):
 		if not financ_name:
 			return
 
+		activo_name = self.activos
+		if not activo_name:
+			return
+
 		try:
 			# fetch current status to decide whether to update parent status
 			current_status = frappe.db.get_value('Financiamientos', financ_name, 'status')
@@ -50,6 +54,12 @@ class CancelarFinanciamiento(Document):
 				('Cancelado', financ_name, 'Pendiente')
 			)
 
+			# Cambiar el estado del activo a 'Disponible'		
+			activo = frappe.get_doc('Activos', activo_name)
+			activo.status = 'Disponible'
+			activo.save(ignore_permissions=True)
+
+			# Commit the transaction
 			frappe.db.commit()
 
 			# Refresh the status field on this Cancelar Financiamiento so the
