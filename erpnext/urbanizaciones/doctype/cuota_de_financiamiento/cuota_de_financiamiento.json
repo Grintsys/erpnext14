@@ -15,7 +15,6 @@
   "saldo_anterior",
   "saldo",
   "status",
-  "payment",
   "notas"
  ],
  "fields": [
@@ -61,12 +60,6 @@
    "reqd": 1
   },
   {
-   "fieldname": "payment",
-   "fieldtype": "Link",
-   "label": "Pago",
-   "options": "Payment Entry"
-  },
-  {
    "fieldname": "notas",
    "fieldtype": "Small Text",
    "label": "Notas"
@@ -87,7 +80,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-09-25 22:45:47.382452",
+ "modified": "2025-10-12 10:10:25.498003",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Cuota de financiamiento",

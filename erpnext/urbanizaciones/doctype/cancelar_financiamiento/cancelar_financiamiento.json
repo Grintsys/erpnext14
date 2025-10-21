@@ -1,0 +1,199 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-10-11 10:34:17.136018",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "naming_series",
+  "financiamientos",
+  "customer",
+  "urbanizaciones",
+  "column_break_1",
+  "activos",
+  "fecha_inicio",
+  "status",
+  "configuracion_financiamiento",
+  "section_break_1",
+  "monto_contrato",
+  "prima",
+  "capital_financiado",
+  "plazo_meses",
+  "column_break_2",
+  "interes_anual",
+  "dia_vencimiento_cuota",
+  "mora_diaria",
+  "cuota_estimada",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Series",
+   "options": "FIN_CAN-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Cancelar Financiamiento",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "fieldname": "financiamientos",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Financiamiento",
+   "options": "Financiamientos",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "financiamientos.customer",
+   "fieldname": "customer",
+   "fieldtype": "Data",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cliente",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.urbanizaciones",
+   "fieldname": "urbanizaciones",
+   "fieldtype": "Data",
+   "label": "Urbanizaci\u00f3n",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.activos",
+   "fieldname": "activos",
+   "fieldtype": "Data",
+   "label": "Activo",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "financiamientos.fecha_inicio",
+   "fieldname": "fecha_inicio",
+   "fieldtype": "Date",
+   "label": "Fecha de inicio",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.status",
+   "fieldname": "status",
+   "fieldtype": "Data",
+   "label": "Estado del financiamiento",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.monto_contrato",
+   "fieldname": "monto_contrato",
+   "fieldtype": "Currency",
+   "label": "Monto del contrato",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.prima",
+   "fieldname": "prima",
+   "fieldtype": "Currency",
+   "label": "Prima",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.capital_financiado",
+   "fieldname": "capital_financiado",
+   "fieldtype": "Currency",
+   "label": "Capital financiado",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_1",
+   "fieldtype": "Section Break",
+   "label": "Parametros financieros"
+  },
+  {
+   "fetch_from": "financiamientos.configuracion_financiamiento",
+   "fieldname": "configuracion_financiamiento",
+   "fieldtype": "Data",
+   "label": "Configuracion seleccionada",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.plazo_meses",
+   "fieldname": "plazo_meses",
+   "fieldtype": "Int",
+   "label": "Plazo en meses",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fetch_from": "financiamientos.interes_anual",
+   "fieldname": "interes_anual",
+   "fieldtype": "Percent",
+   "label": "Interes anual",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.dia_vencimiento_cuota",
+   "fieldname": "dia_vencimiento_cuota",
+   "fieldtype": "Int",
+   "label": "D\u00eda de vencimiento",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.mora_diaria",
+   "fieldname": "mora_diaria",
+   "fieldtype": "Percent",
+   "label": "Mora diaria",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "financiamientos.cuota_estimada",
+   "fieldname": "cuota_estimada",
+   "fieldtype": "Currency",
+   "label": "Cuota estimada",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2025-10-20 21:27:55.922334",
+ "modified_by": "Administrator",
+ "module": "Urbanizaciones",
+ "name": "Cancelar Financiamiento",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
