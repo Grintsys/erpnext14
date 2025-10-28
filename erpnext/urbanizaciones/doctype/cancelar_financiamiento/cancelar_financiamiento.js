@@ -3,11 +3,12 @@
 
 frappe.ui.form.on('Cancelar Financiamiento', {
 	onload: function(frm) {
+		// incluir financiamientos con status 'Activo' o 'Refinanciado'
 		frm.set_query('financiamientos', function() {
 			return {
-				filters: {
-					status: 'Activo'
-				}
+				filters: [
+					['status', 'in', ['Activo', 'Refinanciado']]
+				]
 			};
 		});
 	}, 
@@ -15,9 +16,9 @@ frappe.ui.form.on('Cancelar Financiamiento', {
 	refresh: function(frm) {
 		frm.set_query('financiamientos', function() {
 			return {
-				filters: {
-					status: 'Activo'
-				}
+				filters: [
+					['status', 'in', ['Activo', 'Refinanciado']]
+				]
 			};
 		});
 	}

@@ -89,6 +89,8 @@ def generar_cuotas(docname):
     # datos base para calcular vencimientos y montos
     fecha_inicio = doc.get('fecha_inicio')  # string o date
     dia_venc = doc.get('dia_vencimiento_cuota')  # número de día preferido (1-31)
+    is_refinancing = doc.get('es_refinanciamiento')  # booleano
+
     try:
         dia_venc = int(dia_venc) if dia_venc is not None else None
     except (ValueError, TypeError):
@@ -116,6 +118,11 @@ def generar_cuotas(docname):
         monthly_payment = Decimal('0.00')
 
     balance = capital_total
+
+    estado_cuota = STATUS_CUOTA[0]
+    
+    if is_refinancing == 'Sí':
+        estado_cuota = STATUS_CUOTA[1]  # Refinanciado
 
     for i in range(1, n + 1):
         # calculate interest for this period
@@ -157,14 +164,37 @@ def generar_cuotas(docname):
             'total_cuota': float(this_payment),
             'saldo_anterior': float(prev_balance),
             'saldo': float(balance),
-            'status': STATUS_CUOTA[0],  # Pendiente
+            'status': estado_cuota,
         }
         doc.append(child_fieldname, row)
 
     
-    # actualizar estado del financiamiento
+    # actualizar estado del financiamiento y del Activo asociado
     if estado_financiamiento == 'Borrador':
-        doc.status = 'Activo'
+        # normalizar valor de es_refinanciamiento (acepta "Si", "Sí", "si", etc.)
+        is_ref = False
+        try:
+            val = doc.get('es_refinanciamiento')
+            if val is not None and str(val).strip().lower() in ('si', 'sí', 's', 'yes', 'y', 'true', '1'):
+                is_ref = True
+        except Exception:
+            is_ref = False
+
+        if is_ref:
+            doc.status = 'Refinanciado'
+            activo_status = 'Refinanciado'
+        else:
+            doc.status = 'Activo'
+            activo_status = 'Financiado'
+
+        # actualizar estado del Activo ligado (si existe)
+        activo_name = doc.get('activos')
+        if activo_name:
+            try:
+                # actualizar directamente en DB para evitar problemas con docstatus del Activo
+                frappe.db.set_value('Activos', activo_name, 'status', activo_status)
+            except Exception:
+                frappe.log_error(frappe.get_traceback(), 'Financiamientos.generar_cuotas - actualizar Activo')
 
     # guardar y devolver
     doc.save(ignore_permissions=True)

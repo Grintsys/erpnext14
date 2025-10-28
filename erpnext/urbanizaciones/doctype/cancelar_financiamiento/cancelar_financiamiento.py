@@ -16,7 +16,7 @@ class CancelarFinanciamiento(Document):
 			return
 
 		status = frappe.db.get_value('Financiamientos', financ_name, 'status')
-		if (status or '').strip() != 'Activo':
+		if (status or '').strip() != 'Activo' and (status or '').strip() != 'Refinanciado':
 			frappe.msgprint(_('El financiamiento {0} no está activo. No se guardará el documento.').format(financ_name))
 			frappe.throw(_('El financiamiento no está activo'))
 
@@ -40,7 +40,7 @@ class CancelarFinanciamiento(Document):
 			current_status = frappe.db.get_value('Financiamientos', financ_name, 'status')
 
 			# Only change parent status to 'Cancelado' if it's currently 'Activo'
-			if (current_status or '').strip() == 'Activo':
+			if (current_status or '').strip() == 'Activo' or (current_status or '').strip() == 'Refinanciado':
 				# update via db
 				frappe.db.set_value('Financiamientos', financ_name, 'status', 'Cancelado')
 
@@ -49,9 +49,9 @@ class CancelarFinanciamiento(Document):
 				"""
 				UPDATE `tabCuota de financiamiento`
 				SET `status` = %s
-				WHERE `parent` = %s AND `status` = %s
+				WHERE `parent` = %s AND (`status` = %s or `status` = %s)
 				""",
-				('Cancelado', financ_name, 'Pendiente')
+				('Cancelado', financ_name, 'Pendiente', 'Refinanciado')
 			)
 
 			# Cambiar el estado del activo a 'Disponible'		
