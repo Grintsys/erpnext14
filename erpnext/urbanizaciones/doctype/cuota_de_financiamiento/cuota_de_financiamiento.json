@@ -15,6 +15,7 @@
   "saldo_anterior",
   "saldo",
   "status",
+  "mora",
   "notas"
  ],
  "fields": [
@@ -75,12 +76,18 @@
    "fieldtype": "Currency",
    "label": "Saldo",
    "reqd": 1
+  },
+  {
+   "fieldname": "mora",
+   "fieldtype": "Currency",
+   "label": "Mora",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-10-12 10:10:25.498003",
+ "modified": "2025-11-05 21:48:11.277792",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Cuota de financiamiento",

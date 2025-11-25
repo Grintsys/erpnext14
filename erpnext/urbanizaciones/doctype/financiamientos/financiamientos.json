@@ -12,6 +12,7 @@
   "naming_series",
   "customer",
   "urbanizaciones",
+  "centro_costo",
   "column_break_1",
   "activos",
   "fecha_inicio",
@@ -209,7 +210,8 @@
    "fieldtype": "Table",
    "label": "Cuotas",
    "options": "Cuota de financiamiento",
-   "read_only": 1
+   "read_only": 1,
+   "columns": "fecha_vencimiento_cuota, capital, saldo, total_cuota, status"
   },
   {
    "fieldname": "amended_from",
@@ -227,12 +229,19 @@
    "fieldtype": "Select",
    "label": "Es un refinanciamiento",
    "options": "No\nS\u00ed"
+  },
+  {
+   "fieldname": "centro_costo",
+   "fieldtype": "Link",
+   "label": "Centro de costo",
+   "options": "Cost Center",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-27 15:44:38.706702",
+ "modified": "2025-10-29 21:16:19.748988",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Financiamientos",

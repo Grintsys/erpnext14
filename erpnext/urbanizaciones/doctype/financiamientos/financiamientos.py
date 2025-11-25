@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, add_months
+from frappe.utils import getdate, add_months, nowdate
 import calendar
 import math
 from decimal import Decimal, getcontext, ROUND_HALF_UP
@@ -164,6 +164,7 @@ def generar_cuotas(docname):
             'total_cuota': float(this_payment),
             'saldo_anterior': float(prev_balance),
             'saldo': float(balance),
+            'mora': 0.0,
             'status': estado_cuota,
         }
         doc.append(child_fieldname, row)
@@ -199,3 +200,46 @@ def generar_cuotas(docname):
     # guardar y devolver
     doc.save(ignore_permissions=True)
     return {'success': True, 'rows_created': int(plazo)}
+
+TWOPLACES = Decimal('0.01')
+
+def update_overdue_mora():
+    """
+    Scheduler: actualizar el campo `mora` en Cuota de financiamiento para filas
+    con status 'Pendiente' y fecha_vencimiento_cuota < hoy.
+
+    Cálculo: mora = saldo * (mora_diaria / 100) * dias_vencidos
+    Redondeo a 2 decimales con ROUND_HALF_UP.
+    """
+    today = nowdate()
+    try:
+        rows = frappe.db.sql("""
+            SELECT name, total_cuota, fecha_vencimiento_cuota, parent
+            FROM `tabCuota de financiamiento`
+            WHERE status = %s
+              AND fecha_vencimiento_cuota < %s
+        """, ('Pendiente', today), as_dict=True)
+
+        for r in rows:
+            try:
+                if not r.get('fecha_vencimiento_cuota'):
+                    continue
+                days = (getdate(today) - getdate(r.fecha_vencimiento_cuota)).days
+                if days <= 0:
+                    continue
+
+                mora_pct = frappe.db.get_value('Financiamientos', r.parent, 'mora_diaria') or 0
+                # Use total_cuota for mora calculation per requirements
+                total_cuota = Decimal(str(r.get('total_cuota') or 0))
+
+                # mora = total_cuota * (mora_diaria/100) * days
+                mora_amount = (total_cuota * (Decimal(str(mora_pct))) * Decimal(days))
+                mora_amount = mora_amount.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
+
+                # set_value acepta float/Decimal; guardamos como string/float
+                frappe.db.set_value('Cuota de financiamiento', r.name, 'mora', float(mora_amount))
+            except Exception:
+                frappe.log_error(frappe.get_traceback(), 'update_overdue_mora_row')
+        frappe.db.commit()
+    except Exception:
+        frappe.log_error(frappe.get_traceback(), 'update_overdue_mora')
