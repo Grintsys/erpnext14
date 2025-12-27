@@ -64,7 +64,7 @@
    "hidden": 0,
    "is_query_report": 0,
    "label": "Operaciones de financiamientos",
-   "link_count": 2,
+   "link_count": 3,
    "link_type": "DocType",
    "onboard": 0,
    "type": "Card Break"
@@ -72,7 +72,7 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Crear financiamiento",
+   "label": "Financiamientos",
    "link_count": 0,
    "link_to": "Financiamientos",
    "link_type": "DocType",
@@ -88,9 +88,19 @@
    "link_type": "DocType",
    "onboard": 0,
    "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Modificar mora",
+   "link_count": 0,
+   "link_to": "Modificar Mora",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
   }
  ],
- "modified": "2025-10-20 21:15:52.093502",
+ "modified": "2025-12-27 11:31:14.254179",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Urbanizacion",
