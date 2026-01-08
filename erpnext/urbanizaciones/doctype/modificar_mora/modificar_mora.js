@@ -62,15 +62,15 @@ frappe.ui.form.on('Modificar Mora', {
                 const cuota = pendientes[0];
 
                 // mostrar información al usuario
-                const fmt = v => (v === undefined || v === null) ? '-' : (Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || v);
-                const msg = `<b>Cuota pendiente más antigua</b><br>
-                    <b>Numero:</b> ${cuota.numero_cuota || '-'}<br>
-                    <b>Vencimiento:</b> ${cuota.fecha_vencimiento_cuota || '-'}<br>
-                    <b>Valor de la cuota:</b> ${fmt(cuota.total_cuota)}<br>
-                    <b>Mora:</b> ${fmt(cuota.mora)}<br>`;
+                // const fmt = v => (v === undefined || v === null) ? '-' : (Number(v).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || v);
+                // const msg = `<b>Cuota pendiente más antigua</b><br>
+                //     <b>Numero:</b> ${cuota.numero_cuota || '-'}<br>
+                //     <b>Vencimiento:</b> ${cuota.fecha_vencimiento_cuota || '-'}<br>
+                //     <b>Valor de la cuota:</b> ${fmt(cuota.total_cuota)}<br>
+                //     <b>Mora:</b> ${fmt(cuota.mora)}<br>`;
                     
 
-                frappe.msgprint({ title: __('Cuota pendiente'), message: msg, indicator: 'blue' });
+                // frappe.msgprint({ title: __('Cuota pendiente'), message: msg, indicator: 'blue' });
 
                 // si tu doctype Modificar Mora tiene campos para guardar la cuota encontrada, setéalos
                 // Ejemplo: campos 'numero_cuota', 'fecha_vencimiento', 'saldo_cuota'
@@ -78,6 +78,7 @@ frappe.ui.form.on('Modificar Mora', {
                 frm.set_value('fecha_vencimiento_cuota', cuota.fecha_vencimiento_cuota).catch(() => {});
                 frm.set_value('total_cuota', cuota.total_cuota).catch(() => {});
                 frm.set_value('mora', cuota.mora).catch(() => {});
+                frm.set_value('mora_negociada', cuota.mora).catch(() => {});
 
             })
             .catch(err => {

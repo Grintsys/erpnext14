@@ -16,6 +16,9 @@
   "total_cuota",
   "fecha_vencimiento_cuota",
   "mora",
+  "section_break_2",
+  "mora_negociada",
+  "motivo",
   "amended_from"
  ],
  "fields": [
@@ -78,12 +81,29 @@
   {
    "fieldname": "column_break_1",
    "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break",
+   "label": "Valor a negociar"
+  },
+  {
+   "fieldname": "mora_negociada",
+   "fieldtype": "Currency",
+   "label": "Mora negociada",
+   "reqd": 1
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-12-27 12:23:26.210571",
+ "modified": "2026-01-07 21:29:20.278102",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Modificar Mora",
