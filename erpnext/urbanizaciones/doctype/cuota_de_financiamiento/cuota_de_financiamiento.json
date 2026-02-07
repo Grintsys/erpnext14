@@ -1,100 +1,115 @@
 {
- "actions": [],
- "allow_rename": 1,
- "creation": "2025-09-18 16:46:27.743792",
- "default_view": "List",
- "doctype": "DocType",
- "editable_grid": 1,
- "engine": "InnoDB",
- "field_order": [
-  "numero_cuota",
-  "fecha_vencimiento_cuota",
-  "capital",
-  "intereses",
-  "total_cuota",
-  "saldo_anterior",
-  "saldo",
-  "status",
-  "mora",
-  "notas"
- ],
- "fields": [
-  {
-   "fieldname": "numero_cuota",
-   "fieldtype": "Int",
-   "in_list_view": 1,
-   "label": "Numero de cuota",
-   "reqd": 1
-  },
-  {
-   "fieldname": "fecha_vencimiento_cuota",
-   "fieldtype": "Date",
-   "in_list_view": 1,
-   "label": "Fecha de vencimiento de la cuota",
-   "reqd": 1
-  },
-  {
-   "fieldname": "capital",
-   "fieldtype": "Currency",
-   "in_list_view": 1,
-   "label": "Capital",
-   "reqd": 1
-  },
-  {
-   "fieldname": "intereses",
-   "fieldtype": "Currency",
-   "label": "Intereses",
-   "reqd": 1
-  },
-  {
-   "fieldname": "saldo_anterior",
-   "fieldtype": "Currency",
-   "label": "Saldo anterior",
-   "reqd": 1
-  },
-  {
-   "default": "Pendiente",
-   "fieldname": "status",
-   "fieldtype": "Data",
-   "label": "Estado de la cuota",
-   "read_only": 1,
-   "reqd": 1
-  },
-  {
-   "fieldname": "notas",
-   "fieldtype": "Small Text",
-   "label": "Notas"
-  },
-  {
-   "fieldname": "total_cuota",
-   "fieldtype": "Currency",
-   "label": "Total cuota",
-   "reqd": 1
-  },
-  {
-   "fieldname": "saldo",
-   "fieldtype": "Currency",
-   "label": "Saldo",
-   "reqd": 1
-  },
-  {
-   "fieldname": "mora",
-   "fieldtype": "Currency",
-   "label": "Mora",
-   "reqd": 1
-  }
- ],
- "index_web_pages_for_search": 1,
- "istable": 1,
- "links": [],
- "modified": "2025-11-05 21:48:11.277792",
- "modified_by": "Administrator",
- "module": "Urbanizaciones",
- "name": "Cuota de financiamiento",
- "owner": "Administrator",
- "permissions": [],
- "sort_field": "modified",
- "sort_order": "DESC",
- "states": [],
- "track_changes": 1
+    "actions": [],
+    "allow_rename": 1,
+    "creation": "2025-09-18 16:46:27.743792",
+    "default_view": "List",
+    "doctype": "DocType",
+    "editable_grid": 1,
+    "engine": "InnoDB",
+    "field_order": [
+        "numero_cuota",
+        "fecha_vencimiento_cuota",
+        "capital",
+        "intereses",
+        "total_cuota",
+        "saldo_anterior",
+        "saldo",
+        "status",
+        "mora",
+        "notas",
+        "pagar_btn"
+    ],
+    "fields": [
+        {
+            "fieldname": "numero_cuota",
+            "fieldtype": "Int",
+            "in_list_view": 1,
+            "label": "Numero de cuota",
+            "read_only": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "fecha_vencimiento_cuota",
+            "fieldtype": "Date",
+            "in_list_view": 1,
+            "label": "Fecha de vencimiento de la cuota",
+            "read_only": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "capital",
+            "fieldtype": "Currency",
+            "in_list_view": 1,
+            "label": "Capital",
+            "read_only": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "intereses",
+            "fieldtype": "Currency",
+            "label": "Intereses",
+            "read_only": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "saldo_anterior",
+            "fieldtype": "Currency",
+            "label": "Saldo anterior",
+            "read_only": 1,
+            "reqd": 1
+        },
+        {
+            "default": "Pendiente",
+            "fieldname": "status",
+            "fieldtype": "Data",
+            "label": "Estado de la cuota",
+            "read_only": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "notas",
+            "fieldtype": "Small Text",
+            "label": "Notas",
+            "read_only": 1
+        },
+        {
+            "fieldname": "total_cuota",
+            "fieldtype": "Currency",
+            "label": "Total cuota",
+            "read_only": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "saldo",
+            "fieldtype": "Currency",
+            "label": "Saldo",
+            "read_only": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "mora",
+            "fieldtype": "Currency",
+            "label": "Mora",
+            "read_only": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "pagar_btn",
+            "fieldtype": "Button",
+            "label": "Pagar"
+        }
+    ],
+    "index_web_pages_for_search": 1,
+    "istable": 1,
+    "links": [],
+    "modified": "2025-11-05 21:48:11.277792",
+    "modified_by": "Administrator",
+    "module": "Urbanizaciones",
+    "name": "Cuota de financiamiento",
+    "owner": "Administrator",
+    "permissions": [],
+    "sort_field": "modified",
+    "sort_order": "DESC",
+    "states": [],
+    "track_changes": 1
 }

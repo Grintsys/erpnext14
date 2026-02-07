@@ -4,5 +4,9 @@
 frappe.ui.form.on('Cuota de financiamiento', {
 	// refresh: function(frm) {
 
-	// }
+	// },
+	pagar_btn: function (frm) {
+		// Logica para el boton Pagar
+		console.log("Boton Pagar presionado");
+	}
 });
