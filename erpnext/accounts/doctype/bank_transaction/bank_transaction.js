@@ -18,6 +18,60 @@ frappe.ui.form.on("Bank Transaction", {
 				frm.call("remove_payment_entries").then(() => frm.refresh());
 			});
 		}
+
+		if (frm.doc.docstatus === 1) {
+
+			// Estado Bancario Dropdown Logic
+			frm.add_custom_button(__("Tránsito"), function () {
+				frm.set_value("custom_estado_bancario", "Tránsito");
+				frm.save();
+			}, __("Estado Bancario"));
+
+			frm.add_custom_button(__("Pre-conciliado"), function () {
+				frm.set_value("custom_estado_bancario", "Pre-conciliado");
+				frm.save();
+			}, __("Estado Bancario"));
+
+			frm.add_custom_button(__("Conciliado"), function () {
+				frm.set_value("custom_estado_bancario", "Conciliado");
+				frm.save();
+			}, __("Estado Bancario"));
+
+			// Manual Journal Entry Creation/Deletion
+			if (!frm.doc.ref_journal_entry) {
+				frm.add_custom_button(__("Crear Asiento Contable"), function () {
+					frappe.confirm(__("¿Está seguro de crear el Asiento Contable?"), () => {
+						frappe.call({
+							method: "make_journal_entry",
+							doc: frm.doc,
+							freeze: true,
+							callback: function (r) {
+								if (!r.exc) {
+									frappe.msgprint(__("Asiento Contable Creado"));
+									frm.reload_doc();
+								}
+							}
+						});
+					});
+				}).addClass("btn-primary");
+			} else {
+				frm.add_custom_button(__("Eliminar Asiento Contable"), function () {
+					frappe.confirm(__("¿Está seguro de eliminar el Asiento Contable vinculado?"), () => {
+						frappe.call({
+							method: "delete_journal_entry",
+							doc: frm.doc,
+							freeze: true,
+							callback: function (r) {
+								if (!r.exc) {
+									frappe.msgprint(__("Asiento Contable Eliminado"));
+									frm.reload_doc();
+								}
+							}
+						});
+					});
+				}).addClass("btn-danger");
+			}
+		}
 	},
 	bank_account: function (frm) {
 		set_bank_statement_filter(frm);

@@ -31,8 +31,163 @@ class BankTransaction(StatusUpdater):
 			self._saving_flag = False
 
 	def on_cancel(self):
+		if self.ref_journal_entry:
+			frappe.throw(frappe._("Please delete the linked Journal Entry before cancelling this transaction."))
+			
 		self.clear_linked_payment_entries(for_cancel=True)
 		self.set_status(update=True)
+
+	@frappe.whitelist()
+	def make_journal_entry(self):
+		if not self.custom_journal_entries:
+			frappe.throw(frappe._("Please add an Account in 'Asiento Contable' table before creating Journal Entry"))
+
+		if self.ref_journal_entry:
+			frappe.throw(frappe._("Journal Entry already exists for this transaction"))
+
+		# 1. Corrección en la Creación (Account)
+		# "Account: Debe ser exactamente el valor del campo bank_account del doctype padre."
+		# Nota: Si el campo bank_account apunta a un DocType 'Bank Account', debemos sacar la cuenta contable de ahí.
+		# Si el usuario insiste en que USE el valor directo, asumimos que bank_account YA es la cuenta contable (Link: Account).
+		# PERO el JSON dice que es Link: Bank Account. Así que usamos get_value.
+		# Si falla, lanzamos error claro.
+		
+		bank_gl_account = frappe.db.get_value("Bank Account", self.bank_account, "account")
+		if not bank_gl_account:
+			# Fallback: Si no tiene cuenta vinculada, quizás el campo bank_account mismo es la cuenta? 
+			# Intentamos validar si self.bank_account es un Account válido.
+			if frappe.db.exists("Account", self.bank_account):
+				bank_gl_account = self.bank_account
+			else:
+				frappe.throw(frappe._("Bank Account {0} does not have a linked GL Account").format(self.bank_account))
+
+		je = frappe.new_doc("Journal Entry")
+		je.voucher_type = "Bank Entry"
+		je.posting_date = self.date
+		je.company = self.company
+		je.cheque_no = self.reference_number
+		je.cheque_date = self.date
+		je.user_remark = self.description
+		je.reference_type = "Bank Transaction"
+		je.reference_name = self.name
+		je.multi_currency = 1 # Force multi-currency to handle different currencies if needed
+
+		# 2. Lógica de Montos
+		deposit = flt(self.deposit)
+		withdrawal = flt(self.withdrawal)
+
+		# Row 1: Bank Account
+		bank_row = {
+			"account": bank_gl_account,
+			"cost_center": self.custom_journal_entries[0].cost_center if self.custom_journal_entries else None,
+			"reference_type": "Bank Transaction",
+			"reference_name": self.name
+		}
+		
+		# Si deposit > 0: Asignar a debit_in_account_currency
+		if deposit > 0:
+			bank_row["debit_in_account_currency"] = deposit
+			bank_row["debit"] = deposit # Base currency assumption or handled by JE
+			bank_row["credit_in_account_currency"] = 0
+			bank_row["credit"] = 0
+		
+		# Si withdrawal > 0: Asignar a credit_in_account_currency
+		elif withdrawal > 0:
+			bank_row["credit_in_account_currency"] = withdrawal
+			bank_row["credit"] = withdrawal
+			bank_row["debit_in_account_currency"] = 0
+			bank_row["debit"] = 0
+
+		je.append("accounts", bank_row)
+
+		# Row 2: Contra Account (from first row of custom_journal_entries)
+		contra_row_data = self.custom_journal_entries[0]
+		
+		contra_row = {
+			"account": contra_row_data.account,
+			"party_type": contra_row_data.party_type,
+			"party": contra_row_data.party,
+			"cost_center": contra_row_data.cost_center,
+			"project": contra_row_data.project,
+			"reference_type": "Bank Transaction",
+			"reference_name": self.name
+		}
+
+		# Balancing logic (Opposite of Bank Row)
+		if deposit > 0:
+			contra_row["credit_in_account_currency"] = deposit
+			contra_row["credit"] = deposit
+			contra_row["debit_in_account_currency"] = 0
+			contra_row["debit"] = 0
+		elif withdrawal > 0:
+			contra_row["debit_in_account_currency"] = withdrawal
+			contra_row["debit"] = withdrawal
+			contra_row["credit_in_account_currency"] = 0
+			contra_row["credit"] = 0
+
+		je.append("accounts", contra_row)
+
+		je.save()
+		je.submit()
+
+		frappe.db.set_value(self.doctype, self.name, "ref_journal_entry", je.name)
+		
+		return je.name
+
+	@frappe.whitelist()
+	def delete_journal_entry(self):
+		# 1. Identificar y Desvincular Bank Transaction
+		if not self.ref_journal_entry:
+			frappe.throw(frappe._("No Journal Entry linked to this transaction"))
+
+		journal_id = self.ref_journal_entry
+		
+		# Paso 1: Romper Vínculo en Bank Transaction (DB directo y Commit)
+		# "Antes de cualquier otra acción, usa frappe.db.set_value... y ejecuta commit"
+		frappe.db.set_value("Bank Transaction", self.name, "ref_journal_entry", None)
+		frappe.db.commit()
+
+		# Validar existencia antes de proceder con limpieza
+		if not frappe.db.exists("Journal Entry", journal_id):
+			self.reload()
+			return
+
+		try:
+			# Paso 2: Limpieza de Referencias en Journal Entry (Accounts)
+			# "Asegúrate de que el campo reference_name (que apunta a la Bank Transaction) se establezca en None"
+			frappe.db.sql("""
+				UPDATE `tabJournal Entry Account`
+				SET reference_type=NULL, reference_name=NULL
+				WHERE parent=%s AND reference_type='Bank Transaction'
+			""", journal_id)
+			frappe.db.commit() # Asegurar cambios
+
+			# Paso 3: Cancelación y Borrado "Silencioso"
+			# "Forzar la cancelación de los GL Entries vinculados primero"
+			frappe.db.sql("""DELETE FROM `tabGL Entry` WHERE voucher_type='Journal Entry' AND voucher_no=%s""", journal_id)
+
+			# "Cancelar y borrar el Journal Entry ignorando los enlaces (links)"
+			journal_doc = frappe.get_doc("Journal Entry", journal_id)
+			journal_doc.db_set("docstatus", 2) # Forzar estado cancelado en DB
+			
+			# Eliminar Journal Entry forzosamente
+			frappe.delete_doc("Journal Entry", journal_id, ignore_permissions=True, force=True)
+		
+		except Exception as e:
+			frappe.log_error(title="Force Delete Journal Entry Failed", message=str(e))
+			# No lanzamos error para no bloquear la UI, ya que el vínculo principal se rompió en el Paso 1
+			frappe.msgprint(__("Warning: Could not fully delete linked Journal Entry, but it has been unlinked. Error: {0}").format(str(e)))
+
+		# Finalización
+		self.reload()
+
+	def get_indicator(self):
+		if self.docstatus == 0:
+			return frappe._("Draft"), "blue"
+		elif self.docstatus == 1:
+			return frappe._("Submitted"), "green"
+		elif self.docstatus == 2:
+			return frappe._("Cancelled"), "red"
 
 	def update_allocations(self):
 		"The doctype does not allow modifications after submission, so write to the db direct"
@@ -164,11 +319,14 @@ class BankTransaction(StatusUpdater):
 			deposit=self.deposit,
 		).match()
 
+
 		if result:
 			party_type, party = result
 			frappe.db.set_value(
 				"Bank Transaction", self.name, field={"party_type": party_type, "party": party}
 			)
+
+
 
 
 @frappe.whitelist()
