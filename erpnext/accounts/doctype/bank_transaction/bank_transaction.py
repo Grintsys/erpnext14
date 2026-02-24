@@ -21,6 +21,9 @@ class BankTransaction(StatusUpdater):
 
 	_saving_flag = False
 
+	def on_update(self):
+		self.sync_transit_balances()
+
 	# nosemgrep: frappe-semgrep-rules.rules.frappe-modifying-but-not-comitting
 	def on_update_after_submit(self):
 		"Run on save(). Avoid recursion caused by multiple saves"
@@ -36,6 +39,60 @@ class BankTransaction(StatusUpdater):
 			
 		self.clear_linked_payment_entries(for_cancel=True)
 		self.set_status(update=True)
+		self.sync_transit_balances(is_cancelled=True)
+
+	def sync_transit_balances(self, is_cancelled=False):
+		if not self.bank_account: 
+			return
+		
+		try:
+			old_doc = self.get_doc_before_save()
+		except Exception:
+			old_doc = None
+
+		old_status = old_doc.custom_estado_bancario if old_doc else None
+		new_status = self.custom_estado_bancario
+
+		old_is_valid = old_doc.docstatus != 2 if old_doc else True
+		new_is_valid = self.docstatus != 2 and not is_cancelled
+
+		# Comprobamos un estado de "tránsito" (cualquier estado diferente a Conciliado y válido)
+		old_in_transit = old_status in ["Tránsito", "Pre-conciliado"] and old_is_valid
+		new_in_transit = new_status in ["Tránsito", "Pre-conciliado"] and new_is_valid
+
+		if old_in_transit == new_in_transit:
+			if old_in_transit:
+				old_dep = flt(old_doc.deposit) if old_doc else 0.0
+				new_dep = flt(self.deposit)
+				old_with = flt(old_doc.withdrawal) if old_doc else 0.0
+				new_with = flt(self.withdrawal)
+				
+				diff_dep = new_dep - old_dep
+				diff_with = new_with - old_with
+				
+				if diff_dep != 0 or diff_with != 0:
+					self._update_bank_account(self.bank_account, diff_dep, diff_with)
+			return
+
+		if new_in_transit and not old_in_transit:
+			# Sumar nuevo monto completo
+			self._update_bank_account(self.bank_account, flt(self.deposit), flt(self.withdrawal))
+		elif old_in_transit and not new_in_transit:
+			# Revertir viejo monto completo
+			old_dep = flt(old_doc.deposit) if old_doc else flt(self.deposit)
+			old_with = flt(old_doc.withdrawal) if old_doc else flt(self.withdrawal)
+			self._update_bank_account(self.bank_account, -old_dep, -old_with)
+
+	def _update_bank_account(self, bank_account_name, delta_deposit, delta_withdrawal):
+		acc = frappe.get_doc("Bank Account", bank_account_name)
+		acc.deposits_in_transit = flt(acc.deposits_in_transit) + delta_deposit
+		acc.deferred_debits = flt(acc.deferred_debits) + delta_withdrawal
+		acc.current_balance = flt(acc.last_reconciliation_balance) + flt(acc.deposits_in_transit) - flt(acc.deferred_debits)
+		
+		# set de base de datos sin disparar hooks costosos save
+		acc.db_set('deposits_in_transit', acc.deposits_in_transit)
+		acc.db_set('deferred_debits', acc.deferred_debits)
+		acc.db_set('current_balance', acc.current_balance)
 
 	@frappe.whitelist()
 	def make_journal_entry(self):
