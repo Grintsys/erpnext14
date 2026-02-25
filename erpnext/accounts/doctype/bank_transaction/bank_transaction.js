@@ -13,6 +13,7 @@ frappe.ui.form.on("Bank Transaction", {
 		});
 	},
 	refresh(frm) {
+		frm.events.setup_party_ui(frm);
 		frm.events.calculate_totals(frm);
 		if (!frm.is_dirty() && frm.doc.payment_entries.length > 0) {
 			frm.add_custom_button(__("Unreconcile Transaction"), () => {
@@ -38,24 +39,8 @@ frappe.ui.form.on("Bank Transaction", {
 				frm.save();
 			}, __("Estado Bancario"));
 
-			// Manual Journal Entry Creation/Deletion
-			if (!frm.doc.ref_journal_entry) {
-				frm.add_custom_button(__("Crear Asiento Contable"), function () {
-					frappe.confirm(__("¿Está seguro de crear el Asiento Contable?"), () => {
-						frappe.call({
-							method: "make_journal_entry",
-							doc: frm.doc,
-							freeze: true,
-							callback: function (r) {
-								if (!r.exc) {
-									frappe.msgprint(__("Asiento Contable Creado"));
-									frm.reload_doc();
-								}
-							}
-						});
-					});
-				}).addClass("btn-primary");
-			} else {
+			// Manual Journal Entry Deletion only (creation is auto)
+			if (frm.doc.ref_journal_entry) {
 				frm.add_custom_button(__("Eliminar Asiento Contable"), function () {
 					frappe.confirm(__("¿Está seguro de eliminar el Asiento Contable vinculado?"), () => {
 						frappe.call({
@@ -77,6 +62,36 @@ frappe.ui.form.on("Bank Transaction", {
 	bank_account: function (frm) {
 		set_bank_statement_filter(frm);
 		frm.events.sync_bank_account(frm);
+		frm.trigger('transaction_type');
+	},
+
+	transaction_type: function (frm) {
+		if (frm.doc.transaction_type === 'Cheque' && frm.doc.bank_account && !frm.doc.check_number) {
+			frappe.db.get_value('Bank Account', frm.doc.bank_account, 'check_correlative', function (r) {
+				if (r) {
+					let correlative = r.check_correlative || 0;
+					frm.set_value('check_number', parseInt(correlative) + 1);
+				}
+			});
+		}
+	},
+
+	setup_party_ui: function (frm) {
+		if (frm.doc.party_type === 'Tercero') {
+			frm.set_df_property('party', 'hidden', 1);
+			frm.set_df_property('custom_beneficiary_name', 'hidden', 0);
+		} else {
+			frm.set_df_property('party', 'hidden', 0);
+			frm.set_df_property('custom_beneficiary_name', 'hidden', 1);
+		}
+	},
+
+	party_type: function (frm) {
+		frm.events.setup_party_ui(frm);
+
+		// Limpiar campos residuales solo si es cambio explícito (UI)
+		frm.set_value('party', '');
+		frm.set_value('custom_beneficiary_name', '');
 	},
 
 	deposit: function (frm) {
@@ -125,6 +140,9 @@ frappe.ui.form.on("Bank Transaction", {
 
 	calculate_totals: function (frm) {
 		if (!frm.doc.custom_journal_entries || frm.doc.custom_journal_entries.length === 0) {
+			frm.set_value('total_debit', 0);
+			frm.set_value('total_credit', 0);
+			frm.set_value('difference', 0);
 			frm.set_intro("");
 			return;
 		}
@@ -140,12 +158,22 @@ frappe.ui.form.on("Bank Transaction", {
 		let diff = Math.abs(total_debit - total_credit);
 		let indicator = diff === 0 ? "green" : "red";
 
+		frm.set_value('total_debit', total_debit);
+		frm.set_value('total_credit', total_credit);
+		frm.set_value('difference', diff);
+
 		let msg = `<b>Asiento Contable</b> - Total Debe: ${format_currency(total_debit)} | Total Haber: ${format_currency(total_credit)} | Diferencia: ${format_currency(diff)}`;
 
 		frm.set_intro(msg, indicator);
 	},
 
 	before_submit: function (frm) {
+		if (['Cheque', 'Transferencia'].includes(frm.doc.transaction_type)) {
+			if (!frm.doc.party && !frm.doc.custom_beneficiary_name) {
+				frappe.throw(__('El campo Beneficiario es obligatorio para Cheques o Transferencias.'));
+			}
+		}
+
 		if (!frm.doc.custom_journal_entries || frm.doc.custom_journal_entries.length === 0) {
 			frappe.throw(__('La tabla de Asientos Contables debe tener al menos una fila.'));
 		}

@@ -9,15 +9,41 @@ from erpnext.controllers.status_updater import StatusUpdater
 
 
 class BankTransaction(StatusUpdater):
+	def before_validate(self):
+		if self.transaction_type in ['Cheque', 'Transferencia']:
+			if not self.party and not self.custom_beneficiary_name:
+				frappe.throw("El campo Beneficiario es obligatorio para Cheques o Transferencias.")
+
+		if self.transaction_type in ['Cheque', 'Transferencia', 'Débito']:
+			self.deposit = 0.0
+		elif self.transaction_type in ['Depósito', 'Crédito', 'Crédito Bancario']:
+			self.withdrawal = 0.0
+
 	def after_insert(self):
 		self.unallocated_amount = abs(flt(self.withdrawal) - flt(self.deposit))
 
 	def on_submit(self):
+		if self.transaction_type == 'Cheque' and self.bank_account:
+			if not self.check_number:
+				correlative = frappe.db.get_value('Bank Account', self.bank_account, 'check_correlative') or 0
+				correlative = int(correlative) + 1
+				self.db_set('check_number', str(correlative))
+			else:
+				try:
+					correlative = int(self.check_number)
+				except:
+					correlative = frappe.db.get_value('Bank Account', self.bank_account, 'check_correlative') or 0
+			
+			frappe.db.set_value('Bank Account', self.bank_account, 'check_correlative', correlative, update_modified=False)
+
 		self.clear_linked_payment_entries()
 		self.set_status()
 
 		if frappe.db.get_single_value("Accounts Settings", "enable_party_matching"):
 			self.auto_set_party()
+
+		if not self.ref_journal_entry:
+			self.make_journal_entry()
 
 	_saving_flag = False
 
@@ -35,11 +61,19 @@ class BankTransaction(StatusUpdater):
 
 	def on_cancel(self):
 		if self.ref_journal_entry:
-			frappe.throw(frappe._("Please delete the linked Journal Entry before cancelling this transaction."))
+			self.delete_journal_entry()
 			
 		self.clear_linked_payment_entries(for_cancel=True)
 		self.set_status(update=True)
 		self.sync_transit_balances(is_cancelled=True)
+		
+		self.db_set('deposit', 0.0)
+		self.db_set('withdrawal', 0.0)
+		self.db_set('unallocated_amount', 0.0)
+		if self.party:
+			self.db_set('party', '')
+		if getattr(self, "custom_beneficiary_name", None):
+			self.db_set('custom_beneficiary_name', '*** ANULADO ***')
 
 	def sync_transit_balances(self, is_cancelled=False):
 		if not self.bank_account: 
@@ -102,87 +136,32 @@ class BankTransaction(StatusUpdater):
 		if self.ref_journal_entry:
 			frappe.throw(frappe._("Journal Entry already exists for this transaction"))
 
-		# 1. Corrección en la Creación (Account)
-		# "Account: Debe ser exactamente el valor del campo bank_account del doctype padre."
-		# Nota: Si el campo bank_account apunta a un DocType 'Bank Account', debemos sacar la cuenta contable de ahí.
-		# Si el usuario insiste en que USE el valor directo, asumimos que bank_account YA es la cuenta contable (Link: Account).
-		# PERO el JSON dice que es Link: Bank Account. Así que usamos get_value.
-		# Si falla, lanzamos error claro.
-		
-		bank_gl_account = frappe.db.get_value("Bank Account", self.bank_account, "account")
-		if not bank_gl_account:
-			# Fallback: Si no tiene cuenta vinculada, quizás el campo bank_account mismo es la cuenta? 
-			# Intentamos validar si self.bank_account es un Account válido.
-			if frappe.db.exists("Account", self.bank_account):
-				bank_gl_account = self.bank_account
-			else:
-				frappe.throw(frappe._("Bank Account {0} does not have a linked GL Account").format(self.bank_account))
-
 		je = frappe.new_doc("Journal Entry")
 		je.voucher_type = "Bank Entry"
 		je.posting_date = self.date
 		je.company = self.company
-		je.cheque_no = self.reference_number
+		je.cheque_no = getattr(self, "check_number", None) or self.reference_number
 		je.cheque_date = self.date
-		je.user_remark = self.description
+		je.user_remark = self.reference_number
 		je.reference_type = "Bank Transaction"
 		je.reference_name = self.name
-		je.multi_currency = 1 # Force multi-currency to handle different currencies if needed
+		je.multi_currency = 1
 
-		# 2. Lógica de Montos
-		deposit = flt(self.deposit)
-		withdrawal = flt(self.withdrawal)
+		for row in self.custom_journal_entries:
+			je_row = {
+				"account": row.account,
+				"cost_center": row.cost_center,
+				"debit_in_account_currency": row.debit_in_account_currency,
+				"credit_in_account_currency": row.credit_in_account_currency,
+				"reference_type": "Bank Transaction",
+				"reference_name": self.name,
+				"user_remark": self.reference_number
+			}
+			if self.party_type != 'Tercero':
+				je_row["party_type"] = row.party_type
+				je_row["party"] = row.party
 
-		# Row 1: Bank Account
-		bank_row = {
-			"account": bank_gl_account,
-			"cost_center": self.custom_journal_entries[0].cost_center if self.custom_journal_entries else None,
-			"reference_type": "Bank Transaction",
-			"reference_name": self.name
-		}
-		
-		# Si deposit > 0: Asignar a debit_in_account_currency
-		if deposit > 0:
-			bank_row["debit_in_account_currency"] = deposit
-			bank_row["debit"] = deposit # Base currency assumption or handled by JE
-			bank_row["credit_in_account_currency"] = 0
-			bank_row["credit"] = 0
-		
-		# Si withdrawal > 0: Asignar a credit_in_account_currency
-		elif withdrawal > 0:
-			bank_row["credit_in_account_currency"] = withdrawal
-			bank_row["credit"] = withdrawal
-			bank_row["debit_in_account_currency"] = 0
-			bank_row["debit"] = 0
-
-		je.append("accounts", bank_row)
-
-		# Row 2: Contra Account (from first row of custom_journal_entries)
-		contra_row_data = self.custom_journal_entries[0]
-		
-		contra_row = {
-			"account": contra_row_data.account,
-			"party_type": contra_row_data.party_type,
-			"party": contra_row_data.party,
-			"cost_center": contra_row_data.cost_center,
-			"project": contra_row_data.project,
-			"reference_type": "Bank Transaction",
-			"reference_name": self.name
-		}
-
-		# Balancing logic (Opposite of Bank Row)
-		if deposit > 0:
-			contra_row["credit_in_account_currency"] = deposit
-			contra_row["credit"] = deposit
-			contra_row["debit_in_account_currency"] = 0
-			contra_row["debit"] = 0
-		elif withdrawal > 0:
-			contra_row["debit_in_account_currency"] = withdrawal
-			contra_row["debit"] = withdrawal
-			contra_row["credit_in_account_currency"] = 0
-			contra_row["credit"] = 0
-
-		je.append("accounts", contra_row)
+			je.append("accounts", je_row)
 
 		je.save()
 		je.submit()

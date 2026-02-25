@@ -14,34 +14,41 @@
   "custom_estado_bancario",
   "company",
   "section_break_4",
-  "deposit",
-  "withdrawal",
+  "transaction_type",
+  "check_number",
   "column_break_7",
   "currency",
+  "deposit",
+  "withdrawal",
   "section_break_10",
-  "description",
-  "reference_number",
+  "party_type",
+  "party",
+  "custom_beneficiary_name",
+  "bank_party_name",
+  "bank_party_account_number",
+  "bank_party_iban",
   "column_break_10",
+  "reference_number",
+  "description",
   "transaction_id",
-  "transaction_type",
+  "party_section",
+  "column_break_3czf",
+  "journal_entry",
+  "custom_voucher_type",
+  "ref_journal_entry",
+  "column_break_5",
+  "total_debit",
+  "total_credit",
+  "difference",
+  "totals_section",
+  "custom_journal_entries",
   "section_break_14",
   "payment_entries",
   "section_break_18",
   "allocated_amount",
   "amended_from",
   "column_break_17",
-  "unallocated_amount",
-  "party_section",
-  "party_type",
-  "party",
-  "column_break_3czf",
-  "bank_party_name",
-  "bank_party_account_number",
-  "bank_party_iban",
-  "journal_entry",
-  "custom_voucher_type",
-  "ref_journal_entry",
-  "custom_journal_entries"
+  "unallocated_amount"
  ],
  "fields": [
   {
@@ -57,9 +64,11 @@
    "set_only_once": 1
   },
   {
+   "default": "Today",
    "fieldname": "date",
    "fieldtype": "Date",
-   "label": "Date"
+   "label": "Date",
+   "reqd": 1
   },
   {
    "fieldname": "column_break_2",
@@ -166,9 +175,9 @@
   {
    "allow_on_submit": 1,
    "fieldname": "party_type",
-   "fieldtype": "Link",
+   "fieldtype": "Select",
    "label": "Party Type",
-   "options": "DocType"
+   "options": "Customer\nSupplier\nEmployee\nShareholder\nTercero"
   },
   {
    "allow_on_submit": 1,
@@ -178,6 +187,13 @@
    "options": "party_type"
   },
   {
+   "depends_on": "eval:doc.party_type == 'Tercero'",
+   "fieldname": "custom_beneficiary_name",
+   "fieldtype": "Data",
+   "label": "Beneficiario Externo"
+  },
+  {
+   "depends_on": "eval:in_list(['Dep\u00f3sito', 'Cr\u00e9dito', 'Cr\u00e9dito Bancario'], doc.transaction_type)",
    "fieldname": "deposit",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -186,6 +202,7 @@
    "options": "currency"
   },
   {
+   "depends_on": "eval:in_list(['Cheque', 'Transferencia', 'D\u00e9bito'], doc.transaction_type)",
    "fieldname": "withdrawal",
    "fieldtype": "Currency",
    "in_list_view": 1,
@@ -199,9 +216,16 @@
   },
   {
    "fieldname": "transaction_type",
-   "fieldtype": "Data",
+   "fieldtype": "Select",
    "label": "Transaction Type",
-   "length": 50
+   "length": 50,
+   "options": "Cheque\nTransferencia\nD\u00e9bito\nDep\u00f3sito\nCr\u00e9dito"
+  },
+  {
+   "depends_on": "eval:doc.transaction_type == 'Cheque'",
+   "fieldname": "check_number",
+   "fieldtype": "Data",
+   "label": "N\u00famero de Cheque"
   },
   {
    "fieldname": "column_break_3czf",
@@ -247,6 +271,32 @@
    "options": "Journal Entry Account"
   },
   {
+   "fieldname": "totals_section",
+   "fieldtype": "Section Break",
+   "label": "Cuentas"
+  },
+  {
+   "fieldname": "total_debit",
+   "fieldtype": "Currency",
+   "label": "Total Debe",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_credit",
+   "fieldtype": "Currency",
+   "label": "Total Haber",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
+   "fieldname": "difference",
+   "fieldtype": "Currency",
+   "label": "Diferencia",
+   "options": "currency",
+   "read_only": 1
+  },
+  {
    "fieldname": "journal_entry",
    "fieldtype": "Section Break",
    "label": "Asiento Contable"
@@ -256,11 +306,15 @@
    "fieldtype": "Link",
    "label": "Referencia Asiento Contable",
    "options": "Journal Entry"
+  },
+  {
+   "fieldname": "column_break_5",
+   "fieldtype": "Column Break"
   }
  ],
  "is_submittable": 1,
  "links": [],
- "modified": "2026-02-11 00:28:33.090428",
+ "modified": "2026-02-25 12:02:03.476980",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "Bank Transaction",
