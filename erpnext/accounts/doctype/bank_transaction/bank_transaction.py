@@ -19,6 +19,20 @@ class BankTransaction(StatusUpdater):
 		elif self.transaction_type in ['Depósito', 'Crédito', 'Crédito Bancario']:
 			self.withdrawal = 0.0
 
+		self.calculate_custom_journal_totals()
+
+	def calculate_custom_journal_totals(self):
+		total_debit = 0.0
+		total_credit = 0.0
+		if getattr(self, "custom_journal_entries", None):
+			for row in self.custom_journal_entries:
+				total_debit += flt(row.debit_in_account_currency)
+				total_credit += flt(row.credit_in_account_currency)
+
+		self.total_debit = total_debit
+		self.total_credit = total_credit
+		self.difference = abs(total_debit - total_credit)
+
 	def after_insert(self):
 		self.unallocated_amount = abs(flt(self.withdrawal) - flt(self.deposit))
 
@@ -31,9 +45,9 @@ class BankTransaction(StatusUpdater):
 			else:
 				try:
 					correlative = int(self.check_number)
-				except:
+				except Exception:
 					correlative = frappe.db.get_value('Bank Account', self.bank_account, 'check_correlative') or 0
-			
+
 			frappe.db.set_value('Bank Account', self.bank_account, 'check_correlative', correlative, update_modified=False)
 
 		self.clear_linked_payment_entries()
