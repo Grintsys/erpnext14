@@ -1,270 +1,267 @@
 {
-    "actions": [],
-    "allow_rename": 1,
-    "autoname": "naming_series:",
-    "creation": "2025-09-14 00:10:33.455982",
-    "default_view": "List",
-    "doctype": "DocType",
-    "editable_grid": 1,
-    "engine": "InnoDB",
-    "field_order": [
-        "section_break_1",
-        "naming_series",
-        "customer",
-        "urbanizaciones",
-        "centro_costo",
-        "column_break_1",
-        "activos",
-        "fecha_inicio",
-        "status",
-        "section_break_2",
-        "configuracion_financiamiento",
-        "monto_contrato",
-        "prima",
-        "capital_financiado",
-        "es_refinanciamiento",
-        "column_break_2",
-        "plazo_meses",
-        "interes_anual",
-        "dia_vencimiento_cuota",
-        "mora_diaria",
-        "section_break_3",
-        "cuota_estimada",
-        "saldo_actual",
-        "column_break_3",
-        "fecha_vencimiento_cuota",
-        "tab_break_1",
-        "cuotas",
-        "amended_from"
-    ],
-    "fields": [
-        {
-            "fieldname": "naming_series",
-            "fieldtype": "Select",
-            "in_list_view": 1,
-            "label": "Series",
-            "options": "FIN-.#####",
-            "reqd": 1
-        },
-        {
-            "fieldname": "customer",
-            "fieldtype": "Link",
-            "in_list_view": 1,
-            "in_standard_filter": 1,
-            "label": "Cliente",
-            "options": "Customer",
-            "reqd": 1
-        },
-        {
-            "fieldname": "urbanizaciones",
-            "fieldtype": "Link",
-            "in_list_view": 1,
-            "in_standard_filter": 1,
-            "label": "Urbanizaci\u00f3n",
-            "options": "Urbanizaciones",
-            "reqd": 1
-        },
-        {
-            "fieldname": "column_break_1",
-            "fieldtype": "Column Break"
-        },
-        {
-            "fieldname": "activos",
-            "fieldtype": "Link",
-            "in_list_view": 1,
-            "label": "Activo",
-            "options": "Activos",
-            "reqd": 1
-        },
-        {
-            "fieldname": "fecha_inicio",
-            "fieldtype": "Date",
-            "label": "Fecha de incio",
-            "reqd": 1
-        },
-        {
-            "default": "Borrador",
-            "fieldname": "status",
-            "fieldtype": "Select",
-            "in_list_view": 1,
-            "label": "Estado",
-            "options": "Borrador\nActivo\nCancelado\nRefinanciado\nCompletado",
-            "read_only": 1
-        },
-        {
-            "fieldname": "section_break_1",
-            "fieldtype": "Section Break",
-            "label": "Datos"
-        },
-        {
-            "fieldname": "monto_contrato",
-            "fieldtype": "Currency",
-            "label": "Monto del contrato",
-            "reqd": 1
-        },
-        {
-            "fieldname": "prima",
-            "fieldtype": "Currency",
-            "label": "Prima",
-            "reqd": 1
-        },
-        {
-            "fieldname": "capital_financiado",
-            "fieldtype": "Currency",
-            "label": "Capital financiado",
-            "precision": "2",
-            "read_only": 1,
-            "reqd": 1
-        },
-        {
-            "fieldname": "plazo_meses",
-            "fieldtype": "Int",
-            "label": "Plazo en meses",
-            "reqd": 1
-        },
-        {
-            "fieldname": "column_break_2",
-            "fieldtype": "Column Break"
-        },
-        {
-            "default": "0",
-            "fetch_from": "configuracion_financiamiento.interes_anual",
-            "fieldname": "interes_anual",
-            "fieldtype": "Percent",
-            "label": "Interes anual",
-            "precision": "2",
-            "read_only": 1,
-            "reqd": 1
-        },
-        {
-            "default": "0",
-            "fetch_from": "configuracion_financiamiento.mora_diaria",
-            "fieldname": "mora_diaria",
-            "fieldtype": "Percent",
-            "label": "Mora diaria",
-            "precision": "2",
-            "read_only": 1,
-            "reqd": 1
-        },
-        {
-            "fieldname": "section_break_2",
-            "fieldtype": "Section Break",
-            "label": "Par\u00e1metros financieros"
-        },
-        {
-            "fieldname": "section_break_3",
-            "fieldtype": "Section Break",
-            "label": "Resumen"
-        },
-        {
-            "description": "Cuota estimada sin seguro.",
-            "fieldname": "cuota_estimada",
-            "fieldtype": "Currency",
-            "label": "Cuota estimada",
-            "precision": "2",
-            "read_only": 1
-        },
-        {
-            "fieldname": "configuracion_financiamiento",
-            "fieldtype": "Link",
-            "label": "Configuracion de financiamiento",
-            "options": "Configuracion de Urbanizacion",
-            "reqd": 1
-        },
-        {
-            "default": "0",
-            "fieldname": "saldo_actual",
-            "fieldtype": "Currency",
-            "in_list_view": 1,
-            "label": "Saldo actual",
-            "precision": "2",
-            "read_only": 1
-        },
-        {
-            "default": "0",
-            "fetch_from": "configuracion_financiamiento.vencimiento_cuota",
-            "fieldname": "dia_vencimiento_cuota",
-            "fieldtype": "Int",
-            "label": "D\u00eda de vencimiento",
-            "read_only": 1,
-            "reqd": 1
-        },
-        {
-            "fieldname": "fecha_vencimiento_cuota",
-            "fieldtype": "Date",
-            "in_list_view": 1,
-            "label": "Pr\u00f3xima fecha de vencimiento",
-            "read_only": 1
-        },
-        {
-            "fieldname": "column_break_3",
-            "fieldtype": "Column Break"
-        },
-        {
-            "fieldname": "tab_break_1",
-            "fieldtype": "Tab Break",
-            "label": "Cuotas"
-        },
-        {
-            "fieldname": "cuotas",
-            "fieldtype": "Table",
-            "label": "Cuotas",
-            "options": "Cuota de financiamiento",
-            "read_only": 0,
-            "cannot_add_rows": 1,
-            "cannot_delete_rows": 1,
-            "columns": "fecha_vencimiento_cuota, capital, saldo, total_cuota, status"
-        },
-        {
-            "fieldname": "amended_from",
-            "fieldtype": "Link",
-            "label": "Amended From",
-            "no_copy": 1,
-            "options": "Financiamientos",
-            "print_hide": 1,
-            "read_only": 1,
-            "search_index": 1
-        },
-        {
-            "default": "No",
-            "fieldname": "es_refinanciamiento",
-            "fieldtype": "Select",
-            "label": "Es un refinanciamiento",
-            "options": "No\nS\u00ed"
-        },
-        {
-            "fieldname": "centro_costo",
-            "fieldtype": "Link",
-            "label": "Centro de costo",
-            "options": "Cost Center",
-            "reqd": 1
-        }
-    ],
-    "index_web_pages_for_search": 1,
-    "is_submittable": 1,
-    "links": [],
-    "modified": "2025-10-29 21:16:19.748988",
-    "modified_by": "Administrator",
-    "module": "Urbanizaciones",
-    "name": "Financiamientos",
-    "naming_rule": "By \"Naming Series\" field",
-    "owner": "Administrator",
-    "permissions": [
-        {
-            "create": 1,
-            "delete": 1,
-            "email": 1,
-            "export": 1,
-            "print": 1,
-            "read": 1,
-            "report": 1,
-            "role": "System Manager",
-            "share": 1,
-            "write": 1
-        }
-    ],
-    "sort_field": "modified",
-    "sort_order": "DESC",
-    "states": [],
-    "track_changes": 1
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-09-14 00:10:33.455982",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_1",
+  "naming_series",
+  "customer",
+  "urbanizaciones",
+  "centro_costo",
+  "column_break_1",
+  "activos",
+  "fecha_inicio",
+  "status",
+  "section_break_2",
+  "configuracion_financiamiento",
+  "monto_contrato",
+  "prima",
+  "capital_financiado",
+  "es_refinanciamiento",
+  "column_break_2",
+  "plazo_meses",
+  "interes_anual",
+  "dia_vencimiento_cuota",
+  "mora_diaria",
+  "section_break_3",
+  "cuota_estimada",
+  "saldo_actual",
+  "column_break_3",
+  "fecha_vencimiento_cuota",
+  "tab_break_1",
+  "cuotas",
+  "amended_from"
+ ],
+ "fields": [
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Series",
+   "options": "FIN-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cliente",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "urbanizaciones",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Urbanizaci\u00f3n",
+   "options": "Urbanizaciones",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "activos",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Activo",
+   "options": "Activos",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fecha_inicio",
+   "fieldtype": "Date",
+   "label": "Fecha de incio",
+   "reqd": 1
+  },
+  {
+   "default": "Borrador",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Estado",
+   "options": "Borrador\nActivo\nCancelado\nRefinanciado\nCompletado",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_1",
+   "fieldtype": "Section Break",
+   "label": "Datos"
+  },
+  {
+   "fieldname": "monto_contrato",
+   "fieldtype": "Currency",
+   "label": "Monto del contrato",
+   "reqd": 1
+  },
+  {
+   "fieldname": "prima",
+   "fieldtype": "Currency",
+   "label": "Prima",
+   "reqd": 1
+  },
+  {
+   "fieldname": "capital_financiado",
+   "fieldtype": "Currency",
+   "label": "Capital financiado",
+   "precision": "2",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "plazo_meses",
+   "fieldtype": "Int",
+   "label": "Plazo en meses",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "0",
+   "fetch_from": "configuracion_financiamiento.interes_anual",
+   "fieldname": "interes_anual",
+   "fieldtype": "Percent",
+   "label": "Interes anual",
+   "precision": "2",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fetch_from": "configuracion_financiamiento.mora_diaria",
+   "fieldname": "mora_diaria",
+   "fieldtype": "Percent",
+   "label": "Mora diaria",
+   "precision": "2",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_2",
+   "fieldtype": "Section Break",
+   "label": "Par\u00e1metros financieros"
+  },
+  {
+   "fieldname": "section_break_3",
+   "fieldtype": "Section Break",
+   "label": "Resumen"
+  },
+  {
+   "description": "Cuota estimada sin seguro.",
+   "fieldname": "cuota_estimada",
+   "fieldtype": "Currency",
+   "label": "Cuota estimada",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "configuracion_financiamiento",
+   "fieldtype": "Link",
+   "label": "Configuracion de financiamiento",
+   "options": "Configuracion de Urbanizacion",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "saldo_actual",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Saldo actual",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fetch_from": "configuracion_financiamiento.vencimiento_cuota",
+   "fieldname": "dia_vencimiento_cuota",
+   "fieldtype": "Int",
+   "label": "D\u00eda de vencimiento",
+   "read_only": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "fecha_vencimiento_cuota",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Pr\u00f3xima fecha de vencimiento",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "tab_break_1",
+   "fieldtype": "Tab Break",
+   "label": "Cuotas"
+  },
+  {
+   "fieldname": "cuotas",
+   "fieldtype": "Table",
+   "label": "Cuotas",
+   "options": "Cuota de financiamiento",
+   "read_only": 1
+  },
+  {
+   "fieldname": "amended_from",
+   "fieldtype": "Link",
+   "label": "Amended From",
+   "no_copy": 1,
+   "options": "Financiamientos",
+   "print_hide": 1,
+   "read_only": 1,
+   "search_index": 1
+  },
+  {
+   "default": "No",
+   "fieldname": "es_refinanciamiento",
+   "fieldtype": "Select",
+   "label": "Es un refinanciamiento",
+   "options": "No\nS\u00ed"
+  },
+  {
+   "fieldname": "centro_costo",
+   "fieldtype": "Link",
+   "label": "Centro de costo",
+   "options": "Cost Center",
+   "reqd": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "is_submittable": 1,
+ "links": [],
+ "modified": "2026-02-09 05:27:45.683360",
+ "modified_by": "Administrator",
+ "module": "Urbanizaciones",
+ "name": "Financiamientos",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
 }
