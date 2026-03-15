@@ -76,9 +76,21 @@ frappe.ui.form.on('Financiamientos', {
                     call_generate();
                 }
             });
+        }
 
-            // ensure custom button starts enabled
-            frm.__btn_generar.prop('disabled', false);
+        // lock 'es_refinanciamiento' if user selected "Si" or if cuotas already exist
+        const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
+        const lockField = (frm.doc.es_refinanciamiento === 'Si') || hasCuotas;
+        frm.set_df_property('es_refinanciamiento', 'read_only', lockField ? 1 : 0);
+    },
+
+    es_refinanciamiento: function(frm) {
+        // if user sets it to "Si" lock it immediately; if "No" only unlock when no cuotas
+        const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
+        if (frm.doc.es_refinanciamiento === 'Si') {
+            frm.set_df_property('es_refinanciamiento', 'read_only', 1);
+        } else {
+            frm.set_df_property('es_refinanciamiento', 'read_only', hasCuotas ? 1 : 0);
         }
     },
 

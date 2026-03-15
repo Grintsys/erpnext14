@@ -12,6 +12,7 @@
   "naming_series",
   "customer",
   "urbanizaciones",
+  "centro_costo",
   "column_break_1",
   "activos",
   "fecha_inicio",
@@ -21,6 +22,7 @@
   "monto_contrato",
   "prima",
   "capital_financiado",
+  "es_refinanciamiento",
   "column_break_2",
   "plazo_meses",
   "interes_anual",
@@ -219,12 +221,26 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
+  },
+  {
+   "default": "No",
+   "fieldname": "es_refinanciamiento",
+   "fieldtype": "Select",
+   "label": "Es un refinanciamiento",
+   "options": "No\nS\u00ed"
+  },
+  {
+   "fieldname": "centro_costo",
+   "fieldtype": "Link",
+   "label": "Centro de costo",
+   "options": "Cost Center",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2025-10-06 21:42:20.315919",
+ "modified": "2026-02-09 05:27:45.683360",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Financiamientos",
