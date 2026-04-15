@@ -11,6 +11,8 @@
   "naming_series",
   "customer",
   "financiamiento",
+  "numero_cuota",
+  "total_cuota",
   "amended_from"
  ],
  "fields": [
@@ -48,14 +50,25 @@
    "fieldtype": "Link",
    "label": "Financiamiento",
    "options": "Financiamientos",
-   "reqd": 1,
-   "get_depends_on": "eval:doc.customer"
+   "reqd": 1
+  },
+  {
+   "fieldname": "numero_cuota",
+   "fieldtype": "Int",
+   "label": "Numero de cuota",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_cuota",
+   "fieldtype": "Currency",
+   "label": "Total cuota",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-03-29 08:25:53.034197",
+ "modified": "2026-04-14 20:28:07.121252",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Generar Factura",
