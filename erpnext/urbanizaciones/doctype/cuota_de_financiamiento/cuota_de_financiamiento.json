@@ -57,7 +57,6 @@
    "fieldname": "status",
    "fieldtype": "Data",
    "label": "Estado de la cuota",
-   "read_only": 1,
    "reqd": 1
   },
   {
@@ -87,7 +86,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2025-11-05 21:48:11.277792",
+ "modified": "2026-02-09 05:31:16.863797",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Cuota de financiamiento",

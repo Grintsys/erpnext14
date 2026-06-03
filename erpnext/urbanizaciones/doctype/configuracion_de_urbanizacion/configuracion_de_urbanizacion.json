@@ -16,7 +16,8 @@
   "mora_diaria",
   "column_break_2",
   "vencimiento_cuota",
-  "naming_series"
+  "naming_series",
+  "prefix"
  ],
  "fields": [
   {
@@ -32,7 +33,7 @@
    "label": "Mora diaria"
   },
   {
-   "description": "Debes seleccionar el dia del mes que quieres usar para asignar como fecha de vencimiento en cada mes.",
+   "description": "Debes seleccionar el dia del mes que quieres usar para asignar como fecha de l\u00edmite de vencimiento en el pago de cada mes.",
    "fieldname": "vencimiento_cuota",
    "fieldtype": "Select",
    "label": "Fecha de vencimiento mensual",
@@ -72,11 +73,18 @@
    "fieldname": "tab_break_1",
    "fieldtype": "Tab Break",
    "label": "Par\u00e1metros"
+  },
+  {
+   "description": "Secuencia con la cual se carga la factura de los financiamientos.",
+   "fieldname": "prefix",
+   "fieldtype": "Select",
+   "label": "Prefijo Facturaci\u00f3n",
+   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-16 20:35:34.482569",
+ "modified": "2026-06-01 23:34:42.351745",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Configuracion de Urbanizacion",

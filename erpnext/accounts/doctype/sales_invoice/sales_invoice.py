@@ -3,6 +3,7 @@
 
 
 from datetime import datetime, timedelta, date
+from erpnext.urbanizaciones.doctype.generar_factura import generar_factura
 import frappe
 from frappe import _, msgprint, throw
 from frappe.contacts.doctype.address.address import get_address_display
@@ -295,6 +296,7 @@ class SalesInvoice(SellingController):
 		self.set_paid_amount()
 
 	def on_submit(self):
+		self.validate_financing()
 		self.validate_pos_paid_amount()
 
 		if not self.auto_repeat:
@@ -390,6 +392,53 @@ class SalesInvoice(SellingController):
 			doc.name_serie = serie
 			doc.insert()
 
+	def validate_financing(self):
+		if not self.invoice_generate:
+			return
+
+		generar_factura = frappe.get_doc(
+			"Generar Factura",
+			self.invoice_generate
+		)
+	
+		if not generar_factura.financiamiento:
+			return
+		
+		financiamiento = frappe.get_doc(
+            "Financiamientos",
+            generar_factura.financiamiento
+        )
+
+		fecha_cuota = getdate(
+            generar_factura.date_quote_financing
+        )
+
+		cuota_encontrada = False
+
+		for cuota in financiamiento.cuotas:
+			if (
+                getdate(cuota.fecha_vencimiento_cuota)
+                == fecha_cuota
+                and cuota.status == "Pendiente"
+            ):
+				cuota.status = "Pagado"
+				cuota.mora = 0
+				
+				cuota_encontrada = True
+				break
+
+		if not cuota_encontrada:
+			frappe.throw(
+                f"No se encontró una cuota pendiente con fecha {fecha_cuota}"
+            )
+		
+		financiamiento.save(ignore_permissions=True)
+
+		frappe.msgprint(
+			f"Cuota con fecha de vencimiento {cuota.fecha_vencimiento_cuota} "
+			f"del financiamiento {financiamiento.name} marcada como pagada."
+		)
+
 	def assign_cai(self):
 		user = frappe.session.user
 
@@ -446,7 +495,7 @@ class SalesInvoice(SellingController):
 			if len(cai_secondary) > 0:
 				final = int(cai[0].final_number) + 1
 				initial = int(cai_secondary[0].initial_number)
-				if final <= initial:
+				if initial <= final:
 					self.assing_data(cai_secondary[0].cai, cai_secondary[0].issue_deadline, cai_secondary[0].initial_number, cai_secondary[0].final_number, user, cai_secondary[0].prefix)
 					doc = frappe.get_doc("CAI", cai[0].name_cai)
 					doc.status = "Inactive"
