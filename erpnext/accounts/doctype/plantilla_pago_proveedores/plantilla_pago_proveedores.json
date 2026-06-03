@@ -1,0 +1,185 @@
+{
+    "actions": [],
+    "allow_rename": 1,
+    "autoname": "naming_series:",
+    "creation": "2026-03-12 10:00:00.000000",
+    "doctype": "DocType",
+    "engine": "InnoDB",
+    "field_order": [
+        "general_section",
+        "naming_series",
+        "company",
+        "posting_date",
+        "column_break_1",
+        "bank_account",
+        "bank_reference",
+        "bridge_account",
+        "clearance_date",
+        "details_section",
+        "payment_details",
+        "summary_section",
+        "currency",
+        "total_allocated_amount",
+        "summary_html",
+        "connections_section",
+        "amended_from"
+    ],
+    "permissions": [
+        {
+            "doctype": "DocPerm",
+            "role": "System Manager",
+            "read": 1,
+            "write": 1,
+            "create": 1,
+            "delete": 1,
+            "submit": 1,
+            "cancel": 1,
+            "amend": 1,
+            "print": 1,
+            "email": 1,
+            "report": 1,
+            "share": 1
+        },
+        {
+            "doctype": "DocPerm",
+            "role": "Accounts Manager",
+            "read": 1,
+            "write": 1,
+            "create": 1,
+            "submit": 1,
+            "cancel": 1,
+            "amend": 1,
+            "print": 1,
+            "email": 1,
+            "report": 1,
+            "share": 1
+        },
+        {
+            "doctype": "DocPerm",
+            "role": "Accounts User",
+            "read": 1,
+            "write": 1,
+            "create": 1,
+            "submit": 1,
+            "print": 1,
+            "email": 1,
+            "report": 1
+        }
+    ],
+    "fields": [
+        {
+            "fieldname": "general_section",
+            "fieldtype": "Section Break",
+            "label": "Información General"
+        },
+        {
+            "fieldname": "naming_series",
+            "fieldtype": "Select",
+            "label": "Serie",
+            "options": "PPP-.YYYY.-",
+            "default": "PPP-.YYYY.-"
+        },
+        {
+            "fieldname": "company",
+            "fieldtype": "Link",
+            "in_standard_filter": 1,
+            "label": "Empresa",
+            "options": "Company",
+            "reqd": 1
+        },
+        {
+            "fieldname": "posting_date",
+            "fieldtype": "Date",
+            "label": "Fecha de Contabilización",
+            "reqd": 1,
+            "default": "Today"
+        },
+        {
+            "fieldname": "column_break_1",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "bank_account",
+            "fieldtype": "Link",
+            "label": "Cuenta Bancaria Real (Filtro Conciliador)",
+            "options": "Bank Account",
+            "reqd": 1
+        },
+        {
+            "fieldname": "bank_reference",
+            "fieldtype": "Data",
+            "label": "Referencia Bancaria (Lote / ACH)",
+            "allow_on_submit": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "bridge_account",
+            "fieldtype": "Link",
+            "label": "Cuenta Puente / Transitoria (GL)",
+            "options": "Account",
+            "reqd": 1
+        },
+        {
+            "fieldname": "clearance_date",
+            "fieldtype": "Date",
+            "label": "Fecha de Conciliación",
+            "read_only": 1,
+            "ignore_user_permissions": 1
+        },
+        {
+            "fieldname": "details_section",
+            "fieldtype": "Section Break",
+            "label": "Detalles de Pago"
+        },
+        {
+            "fieldname": "payment_details",
+            "fieldtype": "Table",
+            "label": "Detalle",
+            "options": "Detalle Plantilla Pago Proveedores",
+            "reqd": 1
+        },
+        {
+            "fieldname": "summary_section",
+            "fieldtype": "Section Break",
+            "label": "Resumen"
+        },
+        {
+            "fieldname": "currency",
+            "fieldtype": "Link",
+            "label": "Moneda",
+            "options": "Currency",
+            "reqd": 1,
+            "read_only": 1
+        },
+        {
+            "fieldname": "total_allocated_amount",
+            "fieldtype": "Currency",
+            "label": "Total Planilla",
+            "read_only": 1,
+            "options": "currency"
+        },
+        {
+            "fieldname": "summary_html",
+            "fieldtype": "HTML",
+            "label": "Resumen Interactivo"
+        },
+        {
+            "fieldname": "connections_section",
+            "fieldtype": "Section Break"
+        },
+        {
+            "fieldname": "amended_from",
+            "fieldtype": "Link",
+            "label": "Referencia a Corregido",
+            "options": "Plantilla Pago Proveedores",
+            "read_only": 1,
+            "no_copy": 1
+        }
+    ],
+    "is_submittable": 1,
+    "links": [],
+    "module": "Accounts",
+    "name": "Plantilla Pago Proveedores",
+    "naming_rule": "By \"Naming Series\" field",
+    "title_field": "bank_reference"
+}

@@ -58,7 +58,18 @@ def validate_required_fields(doc):
         frappe.throw(_("Faltan campos requeridos: {0}").format(", ".join(missing)))
 
 class Financiamientos(Document):
-    pass
+    def validate(self):
+        self.validate_activo_urbanizacion()
+
+    def validate_activo_urbanizacion(self):
+        if self.activos and self.urbanizaciones:
+            activo_urbanizacion = frappe.db.get_value('Activos', self.activos, 'urbanizaciones')
+            if activo_urbanizacion != self.urbanizaciones:
+                frappe.throw(
+                    _("El Activo seleccionado ({0}) no pertenece a la Urbanización seleccionada ({1}).").format(
+                        self.activos, self.urbanizaciones
+                    )
+                )
 
 @frappe.whitelist()
 def generar_cuotas(docname):

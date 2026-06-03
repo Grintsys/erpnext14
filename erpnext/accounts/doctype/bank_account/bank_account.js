@@ -41,6 +41,26 @@ frappe.ui.form.on("Bank Account", {
 				);
 			});
 		}
+
+		if (!frm.doc.__islocal) {
+			frm.add_custom_button(__("Recalcular Saldos"), function () {
+				frm.call({
+					method: "recalculate_balances",
+					doc: frm.doc,
+					freeze: true,
+					freeze_message: "Recalculando...",
+					callback: function (r) {
+						if (!r.exc) {
+							frappe.show_alert({
+								message: __("Saldos Recalculados con Éxito"),
+								indicator: "green"
+							});
+							frm.reload_doc();
+						}
+					}
+				});
+			});
+		}
 	},
 
 	is_company_account: function (frm) {

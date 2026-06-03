@@ -33,6 +33,7 @@
   "saldo_actual",
   "column_break_3",
   "fecha_vencimiento_cuota",
+  "total_financiado",
   "tab_break_1",
   "cuotas",
   "amended_from"
@@ -99,7 +100,7 @@
   {
    "fieldname": "monto_contrato",
    "fieldtype": "Currency",
-   "label": "Monto del contrato",
+   "label": "Valor de contado",
    "reqd": 1
   },
   {
@@ -235,6 +236,13 @@
    "label": "Centro de costo",
    "options": "Cost Center",
    "reqd": 1
+  },
+  {
+   "fieldname": "total_financiado",
+   "fieldtype": "Currency",
+   "label": "Total financiado",
+   "precision": "2",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

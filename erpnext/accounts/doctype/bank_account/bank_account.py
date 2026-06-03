@@ -9,7 +9,7 @@ from frappe.contacts.address_and_contact import (
 	load_address_and_contact,
 )
 from frappe.model.document import Document
-from frappe.utils import comma_and, get_link_to_form
+from frappe.utils import comma_and, flt, get_link_to_form
 
 
 class BankAccount(Document):
@@ -27,6 +27,50 @@ class BankAccount(Document):
 		self.validate_company()
 		self.validate_iban()
 		self.validate_account()
+		self.calculate_current_balance()
+
+	def calculate_current_balance(self):
+		self.current_balance = (
+			flt(self.last_reconciliation_balance) 
+			+ flt(self.deposits_in_transit) 
+			- flt(self.deferred_debits)
+		)
+
+	@frappe.whitelist()
+	def recalculate_balances(self):
+		"""
+		Limpia campos de tránsito y vuelve a sumar todas las Bank Transactions activas 
+		en estado de tránsito o pre-conciliadas.
+		"""
+		deposits = 0.0
+		debits = 0.0
+		
+		# Obtener transacciones válidas
+		transactions = frappe.db.sql("""
+			SELECT deposit, withdrawal
+			FROM `tabBank Transaction`
+			WHERE bank_account = %s
+			AND docstatus != 2
+			AND custom_estado_bancario IN ('Tránsito', 'Pre-conciliado')
+		""", self.name, as_dict=True)
+		
+		for t in transactions:
+			deposits += flt(t.deposit)
+			debits += flt(t.withdrawal)
+			
+		self.db_set('deposits_in_transit', deposits)
+		self.db_set('deferred_debits', debits)
+		
+		self.deposits_in_transit = deposits
+		self.deferred_debits = debits
+		self.calculate_current_balance()
+		self.db_set('current_balance', self.current_balance)
+		
+		return {
+			"deposits_in_transit": deposits,
+			"deferred_debits": debits,
+			"current_balance": self.current_balance
+		}
 
 	def validate_account(self):
 		if self.account:

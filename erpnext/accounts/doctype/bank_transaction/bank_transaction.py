@@ -9,17 +9,60 @@ from erpnext.controllers.status_updater import StatusUpdater
 
 
 class BankTransaction(StatusUpdater):
+	def before_validate(self):
+		if self.transaction_type in ['Cheque', 'Transferencia']:
+			if not self.party and not self.custom_beneficiary_name:
+				frappe.throw("El campo Beneficiario es obligatorio para Cheques o Transferencias.")
+
+		if self.transaction_type in ['Cheque', 'Transferencia', 'Débito']:
+			self.deposit = 0.0
+		elif self.transaction_type in ['Depósito', 'Crédito', 'Crédito Bancario']:
+			self.withdrawal = 0.0
+
+		self.calculate_custom_journal_totals()
+
+	def calculate_custom_journal_totals(self):
+		total_debit = 0.0
+		total_credit = 0.0
+		if getattr(self, "custom_journal_entries", None):
+			for row in self.custom_journal_entries:
+				total_debit += flt(row.debit_in_account_currency)
+				total_credit += flt(row.credit_in_account_currency)
+
+		self.total_debit = total_debit
+		self.total_credit = total_credit
+		self.difference = abs(total_debit - total_credit)
+
 	def after_insert(self):
 		self.unallocated_amount = abs(flt(self.withdrawal) - flt(self.deposit))
 
 	def on_submit(self):
+		if self.transaction_type == 'Cheque' and self.bank_account:
+			if not self.check_number:
+				correlative = frappe.db.get_value('Bank Account', self.bank_account, 'check_correlative') or 0
+				correlative = int(correlative) + 1
+				self.db_set('check_number', str(correlative))
+			else:
+				try:
+					correlative = int(self.check_number)
+				except Exception:
+					correlative = frappe.db.get_value('Bank Account', self.bank_account, 'check_correlative') or 0
+
+			frappe.db.set_value('Bank Account', self.bank_account, 'check_correlative', correlative, update_modified=False)
+
 		self.clear_linked_payment_entries()
 		self.set_status()
 
 		if frappe.db.get_single_value("Accounts Settings", "enable_party_matching"):
 			self.auto_set_party()
 
+		if not self.ref_journal_entry:
+			self.make_journal_entry()
+
 	_saving_flag = False
+
+	def on_update(self):
+		self.sync_transit_balances()
 
 	# nosemgrep: frappe-semgrep-rules.rules.frappe-modifying-but-not-comitting
 	def on_update_after_submit(self):
@@ -31,8 +74,170 @@ class BankTransaction(StatusUpdater):
 			self._saving_flag = False
 
 	def on_cancel(self):
+		if self.ref_journal_entry:
+			self.delete_journal_entry()
+			
 		self.clear_linked_payment_entries(for_cancel=True)
 		self.set_status(update=True)
+		self.sync_transit_balances(is_cancelled=True)
+		
+		self.db_set('deposit', 0.0)
+		self.db_set('withdrawal', 0.0)
+		self.db_set('unallocated_amount', 0.0)
+		if self.party:
+			self.db_set('party', '')
+		if getattr(self, "custom_beneficiary_name", None):
+			self.db_set('custom_beneficiary_name', '*** ANULADO ***')
+
+	def sync_transit_balances(self, is_cancelled=False):
+		if not self.bank_account: 
+			return
+		
+		try:
+			old_doc = self.get_doc_before_save()
+		except Exception:
+			old_doc = None
+
+		old_status = old_doc.custom_estado_bancario if old_doc else None
+		new_status = self.custom_estado_bancario
+
+		old_is_valid = old_doc.docstatus != 2 if old_doc else True
+		new_is_valid = self.docstatus != 2 and not is_cancelled
+
+		# Comprobamos un estado de "tránsito" (cualquier estado diferente a Conciliado y válido)
+		old_in_transit = old_status in ["Tránsito", "Pre-conciliado"] and old_is_valid
+		new_in_transit = new_status in ["Tránsito", "Pre-conciliado"] and new_is_valid
+
+		if old_in_transit == new_in_transit:
+			if old_in_transit:
+				old_dep = flt(old_doc.deposit) if old_doc else 0.0
+				new_dep = flt(self.deposit)
+				old_with = flt(old_doc.withdrawal) if old_doc else 0.0
+				new_with = flt(self.withdrawal)
+				
+				diff_dep = new_dep - old_dep
+				diff_with = new_with - old_with
+				
+				if diff_dep != 0 or diff_with != 0:
+					self._update_bank_account(self.bank_account, diff_dep, diff_with)
+			return
+
+		if new_in_transit and not old_in_transit:
+			# Sumar nuevo monto completo
+			self._update_bank_account(self.bank_account, flt(self.deposit), flt(self.withdrawal))
+		elif old_in_transit and not new_in_transit:
+			# Revertir viejo monto completo
+			old_dep = flt(old_doc.deposit) if old_doc else flt(self.deposit)
+			old_with = flt(old_doc.withdrawal) if old_doc else flt(self.withdrawal)
+			self._update_bank_account(self.bank_account, -old_dep, -old_with)
+
+	def _update_bank_account(self, bank_account_name, delta_deposit, delta_withdrawal):
+		acc = frappe.get_doc("Bank Account", bank_account_name)
+		acc.deposits_in_transit = flt(acc.deposits_in_transit) + delta_deposit
+		acc.deferred_debits = flt(acc.deferred_debits) + delta_withdrawal
+		acc.current_balance = flt(acc.last_reconciliation_balance) + flt(acc.deposits_in_transit) - flt(acc.deferred_debits)
+		
+		# set de base de datos sin disparar hooks costosos save
+		acc.db_set('deposits_in_transit', acc.deposits_in_transit)
+		acc.db_set('deferred_debits', acc.deferred_debits)
+		acc.db_set('current_balance', acc.current_balance)
+
+	@frappe.whitelist()
+	def make_journal_entry(self):
+		if not self.custom_journal_entries:
+			frappe.throw(frappe._("Please add an Account in 'Asiento Contable' table before creating Journal Entry"))
+
+		if self.ref_journal_entry:
+			frappe.throw(frappe._("Journal Entry already exists for this transaction"))
+
+		je = frappe.new_doc("Journal Entry")
+		je.voucher_type = "Bank Entry"
+		je.posting_date = self.date
+		je.company = self.company
+		je.cheque_no = getattr(self, "check_number", None) or self.reference_number
+		je.cheque_date = self.date
+		je.user_remark = self.reference_number
+		je.reference_type = "Bank Transaction"
+		je.reference_name = self.name
+		je.multi_currency = 1
+
+		for row in self.custom_journal_entries:
+			je_row = {
+				"account": row.account,
+				"cost_center": row.cost_center,
+				"debit_in_account_currency": row.debit_in_account_currency,
+				"credit_in_account_currency": row.credit_in_account_currency,
+				"reference_type": "Bank Transaction",
+				"reference_name": self.name,
+				"user_remark": self.reference_number
+			}
+			if self.party_type != 'Tercero':
+				je_row["party_type"] = row.party_type
+				je_row["party"] = row.party
+
+			je.append("accounts", je_row)
+
+		je.save()
+		je.submit()
+
+		frappe.db.set_value(self.doctype, self.name, "ref_journal_entry", je.name)
+		
+		return je.name
+
+	@frappe.whitelist()
+	def delete_journal_entry(self):
+		# 1. Identificar y Desvincular Bank Transaction
+		if not self.ref_journal_entry:
+			frappe.throw(frappe._("No Journal Entry linked to this transaction"))
+
+		journal_id = self.ref_journal_entry
+		
+		# Paso 1: Romper Vínculo en Bank Transaction (DB directo y Commit)
+		# "Antes de cualquier otra acción, usa frappe.db.set_value... y ejecuta commit"
+		frappe.db.set_value("Bank Transaction", self.name, "ref_journal_entry", None)
+		frappe.db.commit()
+
+		# Validar existencia antes de proceder con limpieza
+		if not frappe.db.exists("Journal Entry", journal_id):
+			self.reload()
+			return
+
+		try:
+			# Paso 2: Limpieza de Referencias en Journal Entry (Accounts)
+			# "Asegúrate de que el campo reference_name (que apunta a la Bank Transaction) se establezca en None"
+			frappe.db.sql("""
+				UPDATE `tabJournal Entry Account`
+				SET reference_type=NULL, reference_name=NULL
+				WHERE parent=%s AND reference_type='Bank Transaction'
+			""", journal_id)
+			frappe.db.commit() # Asegurar cambios
+
+			# Paso 3: Cancelación y Borrado "Silencioso"
+			# "Forzar la cancelación de los GL Entries vinculados primero"
+			frappe.db.sql("""DELETE FROM `tabGL Entry` WHERE voucher_type='Journal Entry' AND voucher_no=%s""", journal_id)
+
+			# "Cancelar y borrar el Journal Entry ignorando los enlaces (links)"
+			journal_doc = frappe.get_doc("Journal Entry", journal_id)
+			journal_doc.db_set("docstatus", 2) # Forzar estado cancelado en DB
+			
+			# Eliminar Journal Entry forzosamente
+			frappe.delete_doc("Journal Entry", journal_id, ignore_permissions=True, force=True)
+		
+		except Exception as e:
+			frappe.log_error(title="Force Delete Journal Entry Failed", message=str(e))
+			# No lanzamos error para no bloquear la UI, ya que el vínculo principal se rompió en el Paso 1
+			frappe.msgprint(__("Warning: Could not fully delete linked Journal Entry, but it has been unlinked. Error: {0}").format(str(e)))
+
+		# Finalización
+		self.reload()
+
+	def get_indicator(self):
+		if self.docstatus == 0:
+			return frappe._("Draft"), "blue"
+		elif self.docstatus == 1:
+			return frappe._("Submitted"), "green"
+		elif self.docstatus == 2:
+			return frappe._("Cancelled"), "red"
 
 	def update_allocations(self):
 		"The doctype does not allow modifications after submission, so write to the db direct"
@@ -164,11 +369,14 @@ class BankTransaction(StatusUpdater):
 			deposit=self.deposit,
 		).match()
 
+
 		if result:
 			party_type, party = result
 			frappe.db.set_value(
 				"Bank Transaction", self.name, field={"party_type": party_type, "party": party}
 			)
+
+
 
 
 @frappe.whitelist()
