@@ -39,6 +39,9 @@
   "due_date_cai",
   "authorized_range",
   "cashier",
+  "section_financing",
+  "invoice_generate",
+  "date_quote_financing",
   "currency_and_price_list",
   "currency",
   "conversion_rate",
@@ -2242,6 +2245,25 @@
    "fieldtype": "Currency",
    "label": "ISV 18%",
    "read_only": 1
+  },
+  {
+   "fieldname": "invoice_generate",
+   "fieldtype": "Link",
+   "label": "Factura Financiamiento",
+   "options": "Generar Factura",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_financing",
+   "fieldtype": "Section Break",
+   "label": "Urbanizaci\u00f3n",
+   "read_only": 1
+  },
+  {
+   "fieldname": "date_quote_financing",
+   "fieldtype": "Date",
+   "label": "Fecha de cuota",
+   "read_only": 1
   }
  ],
  "icon": "fa fa-file-text",
@@ -2254,7 +2276,7 @@
    "link_fieldname": "consolidated_invoice"
   }
  ],
- "modified": "2025-02-27 14:53:40.440519",
+ "modified": "2026-06-02 21:36:58.761714",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "Sales Invoice",
