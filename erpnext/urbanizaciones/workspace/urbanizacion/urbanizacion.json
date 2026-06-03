@@ -102,15 +102,6 @@
   {
    "hidden": 0,
    "is_query_report": 0,
-   "label": "Pagos",
-   "link_count": 0,
-   "link_type": "DocType",
-   "onboard": 0,
-   "type": "Card Break"
-  },
-  {
-   "hidden": 0,
-   "is_query_report": 0,
    "label": "Generar Factura",
    "link_count": 0,
    "link_to": "Generar Factura",
@@ -119,7 +110,7 @@
    "type": "Link"
   }
  ],
- "modified": "2026-06-02 22:37:49.640876",
+ "modified": "2026-06-02 22:46:49.126367",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Urbanizacion",
