@@ -91,7 +91,7 @@
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2025-09-10 20:52:43.419879",
+ "modified": "2026-06-02 16:41:04.816829",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Activos",
@@ -111,6 +111,7 @@
    "write": 1
   }
  ],
+ "search_fields": "naming_series, urbanizaciones",
  "show_title_field_in_link": 1,
  "sort_field": "modified",
  "sort_order": "DESC",

@@ -2,6 +2,16 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('Financiamientos', {
+    setup: function(frm) {
+        frm.set_query('activos', function() {
+            return {
+                filters: {
+                    urbanizaciones: frm.doc.urbanizaciones || ''
+                }
+            };
+        });
+    },
+
     onload: function(frm)
     {
 		// Calculate capital_financiado on load if fields already have values
@@ -91,6 +101,26 @@ frappe.ui.form.on('Financiamientos', {
             frm.set_df_property('es_refinanciamiento', 'read_only', 1);
         } else {
             frm.set_df_property('es_refinanciamiento', 'read_only', hasCuotas ? 1 : 0);
+        }
+    },
+
+    urbanizaciones: function(frm) {
+        if (frm.doc.activos) {
+            frappe.db.get_value('Activos', frm.doc.activos, 'urbanizaciones', function(r) {
+                if (r && r.urbanizaciones !== frm.doc.urbanizaciones) {
+                    frm.set_value('activos', '');
+                }
+            });
+        }
+    },
+
+    activos: function(frm) {
+        if (frm.doc.activos) {
+            frappe.db.get_value('Activos', frm.doc.activos, 'centro_de_costo', function(r) {
+                if (r && r.centro_de_costo) {
+                    frm.set_value('centro_costo', r.centro_de_costo);
+                }
+            });
         }
     },
 
