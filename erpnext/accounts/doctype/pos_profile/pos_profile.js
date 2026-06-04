@@ -4,11 +4,11 @@
 {% include "erpnext/public/js/controllers/accounts.js" %}
 
 frappe.ui.form.on('POS Profile', {
-	onload: function(frm) {
-        frm.events.get_transactions(frm);
+	onload: function (frm) {
+		frm.events.get_transactions(frm);
 
 		setTimeout(() => {
-		const input = frm.fields_dict.password_manager?.$wrapper.find('input');
+			const input = frm.fields_dict.password_manager?.$wrapper.find('input');
 			if (input && input.length) {
 				input.attr('type', 'password');
 			}
@@ -20,56 +20,66 @@ frappe.ui.form.on('POS Profile', {
 			if (wrapper) {
 				const toggleBtn = wrapper.find('.toggle-password');
 				if (toggleBtn.length) {
-				toggleBtn.remove();
+					toggleBtn.remove();
 				}
 			}
 		}, 300);
-    },
 
-    get_transactions: function(frm) {
-        frappe.call({
-            method: "get_transactions_and_prefixes",
+		frappe.call({
+			method: "get_prefix",
 			doc: frm.doc,
-            callback: function(r) {
-                frm.set_df_property("select_doc_for_series", "options", r.message.transactions);
-            }
-        });
-    },
+			callback: function (r) {
+				if (r.message) {
+					frm.set_df_property("prefix", "options", r.message.prefix);
+				}
+			}
+		});
+	},
 
-    get_prefix: function(frm) {
-        frappe.call({
-            method: "get_prefix",
+	get_transactions: function (frm) {
+		frappe.call({
+			method: "get_transactions_and_prefixes",
 			doc: frm.doc,
-            callback: function(r) {
-                frm.set_df_property("prefix", "options", r.message.prefix);
-            }
-        });
-    },
+			callback: function (r) {
+				frm.set_df_property("select_doc_for_series", "options", r.message.transactions);
+			}
+		});
+	},
 
-    select_doc_for_series: function(frm) {
-        frappe.call({
-            method: "get_prefix",
+	get_prefix: function (frm) {
+		frappe.call({
+			method: "get_prefix",
 			doc: frm.doc,
-            callback: function(r) {
-                frm.set_df_property("prefix", "options", r.message.prefix);
-            }
-        });
-    },
+			callback: function (r) {
+				frm.set_df_property("prefix", "options", r.message.prefix);
+			}
+		});
+	},
 
-	setup: function(frm) {
-		frm.set_query("selling_price_list", function() {
+	select_doc_for_series: function (frm) {
+		frappe.call({
+			method: "get_prefix",
+			doc: frm.doc,
+			callback: function (r) {
+				frm.set_df_property("prefix", "options", r.message.prefix);
+			}
+		});
+	},
+
+	setup: function (frm) {
+		frm.set_query("selling_price_list", function () {
 			return { filters: { selling: 1 } };
 		});
 
-		frm.set_query("tc_name", function() {
+		frm.set_query("tc_name", function () {
 			return { filters: { selling: 1 } };
 		});
 
-		erpnext.queries.setup_queries(frm, "Warehouse", function() {
+		erpnext.queries.setup_queries(frm, "Warehouse", function () {
 			return erpnext.queries.warehouse(frm.doc);
 		});
 
-		frm.set_query("print_format", function() {
+		frm.set_query("print_format", function () {
 			return {
 				filters: [
 					['Print Format', 'doc_type', '=', 'POS Invoice']
@@ -77,7 +87,7 @@ frappe.ui.form.on('POS Profile', {
 			};
 		});
 
-		frm.set_query("account_for_change_amount", function(doc) {
+		frm.set_query("account_for_change_amount", function (doc) {
 			if (!doc.company) {
 				frappe.throw(__('Please set Company'));
 			}
@@ -91,7 +101,7 @@ frappe.ui.form.on('POS Profile', {
 			};
 		});
 
-		frm.set_query("taxes_and_charges", function() {
+		frm.set_query("taxes_and_charges", function () {
 			return {
 				filters: [
 					['Sales Taxes and Charges Template', 'company', '=', frm.doc.company],
@@ -100,7 +110,7 @@ frappe.ui.form.on('POS Profile', {
 			};
 		});
 
-		frm.set_query('company_address', function(doc) {
+		frm.set_query('company_address', function (doc) {
 			if (!doc.company) {
 				frappe.throw(__('Please set Company'));
 			}
@@ -114,7 +124,7 @@ frappe.ui.form.on('POS Profile', {
 			};
 		});
 
-		frm.set_query('income_account', function(doc) {
+		frm.set_query('income_account', function (doc) {
 			if (!doc.company) {
 				frappe.throw(__('Please set Company'));
 			}
@@ -128,7 +138,7 @@ frappe.ui.form.on('POS Profile', {
 			};
 		});
 
-		frm.set_query('cost_center', function(doc) {
+		frm.set_query('cost_center', function (doc) {
 			if (!doc.company) {
 				frappe.throw(__('Please set Company'));
 			}
@@ -141,7 +151,7 @@ frappe.ui.form.on('POS Profile', {
 			};
 		});
 
-		frm.set_query('expense_account', function(doc) {
+		frm.set_query('expense_account', function (doc) {
 			if (!doc.company) {
 				frappe.throw(__('Please set Company'));
 			}
@@ -155,7 +165,7 @@ frappe.ui.form.on('POS Profile', {
 			};
 		});
 
-		frm.set_query("select_print_heading", function() {
+		frm.set_query("select_print_heading", function () {
 			return {
 				filters: [
 					['Print Heading', 'docstatus', '!=', 2]
@@ -163,7 +173,7 @@ frappe.ui.form.on('POS Profile', {
 			};
 		});
 
-		frm.set_query("write_off_account", function(doc) {
+		frm.set_query("write_off_account", function (doc) {
 			return {
 				filters: {
 					'report_type': 'Profit and Loss',
@@ -173,7 +183,7 @@ frappe.ui.form.on('POS Profile', {
 			};
 		});
 
-		frm.set_query("write_off_cost_center", function(doc) {
+		frm.set_query("write_off_cost_center", function (doc) {
 			return {
 				filters: {
 					'is_group': 0,
@@ -185,18 +195,18 @@ frappe.ui.form.on('POS Profile', {
 		erpnext.accounts.dimensions.setup_dimension_filters(frm, frm.doctype);
 	},
 
-	refresh: function(frm) {
+	refresh: function (frm) {
 		if (frm.doc.company) {
 			frm.trigger("toggle_display_account_head");
 		}
 	},
 
-	company: function(frm) {
+	company: function (frm) {
 		frm.trigger("toggle_display_account_head");
 		erpnext.accounts.dimensions.update_dimension(frm, frm.doctype);
 	},
 
-	toggle_display_account_head: function(frm) {
+	toggle_display_account_head: function (frm) {
 		frm.toggle_display('expense_account',
 			erpnext.is_perpetual_inventory_enabled(frm.doc.company));
 	}
