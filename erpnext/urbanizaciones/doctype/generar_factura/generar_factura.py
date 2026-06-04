@@ -80,9 +80,15 @@ class GenerarFactura(Document):
                 _("Debe configurar el Item a facturar como Cuota.")
             )
 
-        if not configuracion.prefix:
+
+        pos_profile = frappe.get_doc(
+            "POS Profile",
+            self.pos_profile
+        )
+
+        if not pos_profile.prefix:
             frappe.throw(
-                _("Debe configurar el Prefijo de Facturación.")
+                _("Debe configurar el Prefijo de Facturación en el Perfil de POS.")
             )
 
         # ==========================
@@ -129,7 +135,9 @@ class GenerarFactura(Document):
         # ==========================
         invoice = frappe.new_doc("Sales Invoice")
 
-        invoice.naming_series = configuracion.prefix
+        invoice.naming_series = pos_profile.prefix
+        invoice.is_pos = 1
+        invoice.pos_profile = self.pos_profile
         invoice.customer = financiamiento.customer
         invoice.due_date = today()
         invoice.ignore_pricing_rule = 1

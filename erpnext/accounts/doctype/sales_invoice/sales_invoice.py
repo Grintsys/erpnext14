@@ -417,13 +417,40 @@ class SalesInvoice(SellingController):
 
 		for cuota in financiamiento.cuotas:
 			if (
-                getdate(cuota.fecha_vencimiento_cuota)
-                == fecha_cuota
-                and cuota.status == "Pendiente"
-            ):
-				cuota.status = "Pagado"
-				cuota.mora = 0
-				
+				getdate(cuota.fecha_vencimiento_cuota) == fecha_cuota
+				and cuota.status == "Pendiente"
+			):
+
+				total_esperado = round(
+					flt(cuota.total_cuota) + flt(cuota.mora),
+					2
+				)
+
+				paid_amount = round(
+					flt(self.paid_amount),
+					2
+				)
+
+				if paid_amount != total_esperado:
+					frappe.throw(
+						_(
+							"El total de la factura debe ser exactamente {0}. "
+							"Total factura: {1}"
+						).format(
+							total_esperado,
+							paid_amount
+						)
+					)
+
+				# Actualizar directamente la fila hija
+				frappe.db.set_value(
+					"Cuota de financiamiento",
+					cuota.name,
+					"status",
+					"Pagado",
+					update_modified=False
+				)
+
 				cuota_encontrada = True
 				break
 
@@ -431,8 +458,6 @@ class SalesInvoice(SellingController):
 			frappe.throw(
                 f"No se encontró una cuota pendiente con fecha {fecha_cuota}"
             )
-		
-		financiamiento.save(ignore_permissions=True)
 
 		frappe.msgprint(
 			f"Cuota con fecha de vencimiento {cuota.fecha_vencimiento_cuota} "

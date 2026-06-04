@@ -16,8 +16,7 @@
   "mora_diaria",
   "column_break_2",
   "vencimiento_cuota",
-  "naming_series",
-  "prefix"
+  "naming_series"
  ],
  "fields": [
   {
@@ -73,18 +72,11 @@
    "fieldname": "tab_break_1",
    "fieldtype": "Tab Break",
    "label": "Par\u00e1metros"
-  },
-  {
-   "description": "Secuencia con la cual se carga la factura de los financiamientos.",
-   "fieldname": "prefix",
-   "fieldtype": "Select",
-   "label": "Prefijo Facturaci\u00f3n",
-   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-06-01 23:34:42.351745",
+ "modified": "2026-06-04 11:40:27.555116",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Configuracion de Urbanizacion",

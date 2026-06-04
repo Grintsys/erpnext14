@@ -5,19 +5,4 @@ import frappe
 from frappe.model.document import Document
 
 class ConfiguraciondeUrbanizacion(Document):
-	
-	@frappe.whitelist()
-	def get_prefix(self):
-		transaction = "Sales Invoice"
-
-		prefixes = ""
-
-		try:
-			options = frappe.get_meta(transaction).get_naming_series_options()
-			prefixes = "\n".join(sorted(options))
-		except Exception as e:
-			frappe.log_error(frappe.get_traceback(), str(e))
-
-		return {
-            "prefix": prefixes
-        }
+	pass
