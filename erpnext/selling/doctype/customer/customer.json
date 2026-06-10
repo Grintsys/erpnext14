@@ -194,6 +194,7 @@
    "reqd": 1
   },
   {
+   "allow_in_quick_entry": 1,
    "fieldname": "tax_id",
    "fieldtype": "Data",
    "label": "Tax ID"
@@ -567,7 +568,7 @@
    "link_fieldname": "party"
   }
  ],
- "modified": "2024-05-08 18:03:20.716169",
+ "modified": "2026-06-10 00:10:57.778888",
  "modified_by": "Administrator",
  "module": "Selling",
  "name": "Customer",
