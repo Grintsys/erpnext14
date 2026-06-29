@@ -166,9 +166,12 @@ frappe.ui.form.on('Financiamientos', {
 function calculate_capital_financiero(frm)
 {
     let monto = frm.doc.monto_contrato || 0;
-    let prima = frm.doc.prima || 0;
+    let prima = frm.doc.prima || 0;    
 
-    frm.set_value('capital_financiado', monto - prima);
+    if (frm.is_new()) {
+        frm.set_value('capital_financiado', monto - prima);    
+        frm.set_value('total_financiado', monto - prima);
+    }
 }
 
 // Function to calculate cuota_estimada
@@ -196,28 +199,36 @@ function calculate_cuota_estimada(frm)
 
 function calculate_proxima_fecha(frm)
 {
-    //Todo: si ya existe el plan de pago, mostrar la fecha de vencimiento de la cuota correspondiente
+    if (frm.is_new()){
+        //Todo: si ya existe el plan de pago, mostrar la fecha de vencimiento de la cuota correspondiente
     
-    const fecha_inicio = frm.doc.fecha_inicio;
-    const dia_vencimiento = frm.doc.dia_vencimiento_cuota;
+        const fecha_inicio = frm.doc.fecha_inicio;
+        const dia_vencimiento = frm.doc.dia_vencimiento_cuota;
 
-    if (fecha_inicio && dia_vencimiento)
-    {
-        let fecha = frappe.datetime.str_to_obj(fecha_inicio);
-        
-        fecha.setMonth(fecha.getMonth() + 1);
-        fecha.setDate(dia_vencimiento);
+        if (fecha_inicio && dia_vencimiento)
+        {
+            let fecha = frappe.datetime.str_to_obj(fecha_inicio);
+            
+            fecha.setMonth(fecha.getMonth() + 1);
+            fecha.setDate(dia_vencimiento);
 
-        frm.set_value('fecha_vencimiento_cuota', frappe.datetime.obj_to_str(fecha));
-    }
-    else
-    {
-        frm.set_value('fecha_vencimiento_cuota', null);
-    }
+            frm.set_value('fecha_vencimiento_cuota', frappe.datetime.obj_to_str(fecha));
+        }
+        else
+        {
+            frm.set_value('fecha_vencimiento_cuota', null);
+        }
+    }    
 }
 
 function calculate_saldo_actual(frm)
 {
-    // Todo: Hacer el calculo correspondiente al capital a medida se pagan las cuotas
-    frm.set_value('saldo_actual', frm.doc.capital_financiado);
+    // Todo: Hacer el calculo correspondiente al capital a medida se pagan las cuotas    
+    if (frm.is_new()) {
+        frm.set_value('saldo_actual', frm.doc.capital_financiado);
+        frm.set_value(
+            'saldo_actual',
+            frm.doc.capital_financiado
+        );
+    }
 }

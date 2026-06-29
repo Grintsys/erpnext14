@@ -415,7 +415,7 @@ class SalesInvoice(SellingController):
 
 		cuota_encontrada = False
 
-		for cuota in financiamiento.cuotas:
+		for index, cuota in enumerate(financiamiento.cuotas):
 			if (
 				getdate(cuota.fecha_vencimiento_cuota) == fecha_cuota
 				and cuota.status == "Pendiente"
@@ -450,6 +450,36 @@ class SalesInvoice(SellingController):
 					"Pagado",
 					update_modified=False
 				)
+
+				nuevo_saldo = flt(financiamiento.saldo_actual) - total_esperado
+
+				if nuevo_saldo < 0:
+					nuevo_saldo = 0
+
+				frappe.db.set_value(
+					"Financiamientos",
+					financiamiento.name,
+					"saldo_actual",
+					nuevo_saldo,
+					update_modified=False
+				)
+
+				siguiente_fecha = None
+
+				for siguiente_cuota in financiamiento.cuotas[index + 1:]:
+					if siguiente_cuota.status == "Pendiente":
+						siguiente_fecha = siguiente_cuota.fecha_vencimiento_cuota
+						break
+
+				# Actualizar la fecha de la próxima cuota
+				if siguiente_fecha:
+					frappe.db.set_value(
+						"Financiamientos",
+						financiamiento.name,
+						"fecha_vencimiento_cuota",
+						siguiente_fecha,
+						update_modified=False
+					)				
 
 				cuota_encontrada = True
 				break
