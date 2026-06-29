@@ -206,15 +206,15 @@ class SalesInvoice(SellingController):
 							# self.taxed_amount_15 += item.amount - (item.amount*(taxitem.tax_rate/100))
 							# self.isv_15 += item.amount*(taxitem.tax_rate/100)
 
-							self.taxed_amount_15 += (item.amount + item.discount_amount)/1.15
-							self.isv_15 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.15)
+							self.taxed_amount_15 += (item.amount)/1.15
+							self.isv_15 += item.amount - (item.amount/1.15)
 
 						if(taxitem.tax_rate == 18):
 							# self.taxed_amount_18 += item.amount - (item.amount*(taxitem.tax_rate/100))
 							# self.isv_18 += item.amount*(taxitem.tax_rate/100)
 
-							self.taxed_amount_18 += (item.amount+ item.discount_amount)/1.18
-							self.isv_18 += (item.amount + item.discount_amount) - ((item.amount + item.discount_amount)/1.18)
+							self.taxed_amount_18 += (item.amount)/1.18
+							self.isv_18 += item.amount - (item.amount/1.18)
 
 						if(taxitem.tax_rate == 0):
 							self.exempt_amount += item.amount
