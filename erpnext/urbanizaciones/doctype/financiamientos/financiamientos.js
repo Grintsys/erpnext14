@@ -165,21 +165,21 @@ frappe.ui.form.on('Financiamientos', {
 // Function to calculate capital_financiado
 function calculate_capital_financiero(frm)
 {
-    let monto = frm.doc.monto_contrato || 0;
-    let prima = frm.doc.prima || 0;    
+    let monto = parseFloat(frm.doc.monto_contrato) || 0;
+    let prima = parseFloat(frm.doc.prima) || 0;    
 
-    if (frm.is_new()) {
+    const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
+    if (frm.is_new() || !hasCuotas) {
         frm.set_value('capital_financiado', monto - prima);    
-        frm.set_value('total_financiado', monto - prima);
     }
 }
 
 // Function to calculate cuota_estimada
 function calculate_cuota_estimada(frm)
 {
-    let interes_anual = frm.doc.interes_anual || 0;
-    let capital = frm.doc.capital_financiado || 0;
-    let cuotas = frm.doc.plazo_meses || 0;
+    let interes_anual = parseFloat(frm.doc.interes_anual) || 0;
+    let capital = parseFloat(frm.doc.capital_financiado) || 0;
+    let cuotas = parseInt(frm.doc.plazo_meses) || 0;
 
     if (interes_anual > 0 && capital > 0 && cuotas > 0)
     {
@@ -195,6 +195,7 @@ function calculate_cuota_estimada(frm)
     {
         frm.set_value('cuota_estimada', 0);
     }
+    calculate_saldo_actual(frm);
 }
 
 function calculate_proxima_fecha(frm)
@@ -223,12 +224,16 @@ function calculate_proxima_fecha(frm)
 
 function calculate_saldo_actual(frm)
 {
-    // Todo: Hacer el calculo correspondiente al capital a medida se pagan las cuotas    
-    if (frm.is_new()) {
-        frm.set_value('saldo_actual', frm.doc.capital_financiado);
-        frm.set_value(
-            'saldo_actual',
-            frm.doc.capital_financiado
-        );
+    const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
+    if (frm.is_new() || !hasCuotas) {
+        let cuota = parseFloat(frm.doc.cuota_estimada) || 0;
+        let plazo = parseInt(frm.doc.plazo_meses) || 0;
+        let prima = parseFloat(frm.doc.prima) || 0;
+
+        let saldo_actual = cuota * plazo;
+        let total_financiado = saldo_actual + prima;
+
+        frm.set_value('saldo_actual', Math.round(saldo_actual * 100) / 100);
+        frm.set_value('total_financiado', Math.round(total_financiado * 100) / 100);
     }
 }

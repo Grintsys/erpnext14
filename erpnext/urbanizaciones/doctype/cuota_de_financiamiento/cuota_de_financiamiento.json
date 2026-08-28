@@ -7,22 +7,21 @@
  "editable_grid": 1,
  "engine": "InnoDB",
  "field_order": [
-  "numero_cuota",
   "fecha_vencimiento_cuota",
   "capital",
   "intereses",
   "total_cuota",
-  "saldo_anterior",
-  "saldo",
   "status",
-  "mora",
-  "notas"
+  "saldo",
+  "notas",
+  "numero_cuota",
+  "saldo_anterior",
+  "mora"
  ],
  "fields": [
   {
    "fieldname": "numero_cuota",
    "fieldtype": "Int",
-   "in_list_view": 1,
    "label": "Numero de cuota",
    "reqd": 1
   },
@@ -43,6 +42,7 @@
   {
    "fieldname": "intereses",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Intereses",
    "reqd": 1
   },
@@ -57,6 +57,7 @@
    "default": "Pendiente",
    "fieldname": "status",
    "fieldtype": "Data",
+   "in_list_view": 1,
    "label": "Estado de la cuota",
    "reqd": 1
   },
@@ -68,12 +69,14 @@
   {
    "fieldname": "total_cuota",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Total cuota",
    "reqd": 1
   },
   {
    "fieldname": "saldo",
    "fieldtype": "Currency",
+   "in_list_view": 1,
    "label": "Saldo",
    "reqd": 1
   },
@@ -87,7 +90,7 @@
  "index_web_pages_for_search": 1,
  "istable": 1,
  "links": [],
- "modified": "2026-06-02 23:32:52.491594",
+ "modified": "2026-08-28 16:08:57.436687",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Cuota de financiamiento",

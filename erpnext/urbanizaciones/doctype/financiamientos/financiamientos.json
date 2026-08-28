@@ -191,6 +191,7 @@
    "reqd": 1
   },
   {
+   "description": "Vencimiento de cuota.",
    "fieldname": "fecha_vencimiento_cuota",
    "fieldtype": "Date",
    "in_list_view": 1,
@@ -248,7 +249,7 @@
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-04 12:04:08.714023",
+ "modified": "2026-08-28 16:01:39.201058",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Financiamientos",

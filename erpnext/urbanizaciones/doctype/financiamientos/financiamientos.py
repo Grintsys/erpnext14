@@ -4,7 +4,7 @@
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import getdate, add_months, nowdate
+from frappe.utils import getdate, add_months, nowdate, flt
 import calendar
 import math
 from decimal import Decimal, getcontext, ROUND_HALF_UP
@@ -60,6 +60,16 @@ def validate_required_fields(doc):
 class Financiamientos(Document):
     def validate(self):
         self.validate_activo_urbanizacion()
+        self.calculate_financial_totals()
+
+    def calculate_financial_totals(self):
+        if self.is_new() or not self.get("cuotas"):
+            cuota = flt(self.cuota_estimada)
+            plazo = flt(self.plazo_meses)
+            prima = flt(self.prima)
+
+            self.saldo_actual = flt(cuota * plazo, 2)
+            self.total_financiado = flt((cuota * plazo) + prima, 2)
 
     def validate_activo_urbanizacion(self):
         if self.activos and self.urbanizaciones:
@@ -244,7 +254,7 @@ def update_overdue_mora():
                 total_cuota = Decimal(str(r.get('total_cuota') or 0))
 
                 # mora = total_cuota * (mora_diaria/100) * days
-                mora_amount = (total_cuota * (Decimal(str(mora_pct))) * Decimal(days))
+                mora_amount = (total_cuota * (Decimal(str(mora_pct)) / Decimal('100')) * Decimal(days))
                 mora_amount = mora_amount.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
 
                 # set_value acepta float/Decimal; guardamos como string/float
