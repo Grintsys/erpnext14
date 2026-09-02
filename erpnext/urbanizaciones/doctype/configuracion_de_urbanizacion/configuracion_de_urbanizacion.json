@@ -1,100 +1,108 @@
 {
-    "actions": [],
-    "allow_rename": 1,
-    "autoname": "naming_series:",
-    "creation": "2025-09-16 19:47:13.057816",
-    "default_view": "List",
-    "doctype": "DocType",
-    "editable_grid": 1,
-    "engine": "InnoDB",
-    "field_order": [
-        "tab_break_1",
-        "item_cuota",
-        "interes_anual",
-        "column_break_1",
-        "item_mora",
-        "mora_diaria",
-        "column_break_2",
-        "vencimiento_cuota",
-        "naming_series"
-    ],
-    "fields": [
-        {
-            "description": "Porcentaje anual. Ej.: 10 = 10%.",
-            "fieldname": "interes_anual",
-            "fieldtype": "Percent",
-            "label": "Interes anual"
-        },
-        {
-            "description": "Porcentaje diario. Ej.: 0.0005 = 0.05% por d\u00eda.",
-            "fieldname": "mora_diaria",
-            "fieldtype": "Percent",
-            "label": "Mora diaria"
-        },
-        {
-            "description": "Debes seleccionar el dia del mes que quieres usar para asignar como fecha de l\u00edmite de vencimiento en el pago de cada mes.",
-            "fieldname": "vencimiento_cuota",
-            "fieldtype": "Select",
-            "label": "Fecha de vencimiento mensual",
-            "options": "\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28"
-        },
-        {
-            "description": "Debe elegir un producto de tipo servicio que se usara al momento de generar la factura por las cuotas cancedas.",
-            "fieldname": "item_cuota",
-            "fieldtype": "Link",
-            "label": "Item a facturar como Cuota",
-            "options": "Item"
-        },
-        {
-            "description": "Debe elegir un producto de tipo servicio que se usara al momento de generar la factura agregando el valor de mora.",
-            "fieldname": "item_mora",
-            "fieldtype": "Link",
-            "label": "Item a facturar como Mora",
-            "options": "Item"
-        },
-        {
-            "fieldname": "column_break_1",
-            "fieldtype": "Column Break"
-        },
-        {
-            "fieldname": "column_break_2",
-            "fieldtype": "Column Break"
-        },
-        {
-            "fieldname": "naming_series",
-            "fieldtype": "Select",
-            "in_list_view": 1,
-            "label": "Series",
-            "options": "CONF-.#####",
-            "reqd": 1
-        },
-        {
-            "fieldname": "tab_break_1",
-            "fieldtype": "Tab Break",
-            "label": "Par\u00e1metros"
-        }
-    ],
-    "index_web_pages_for_search": 1,
-    "links": [],
-    "modified": "2026-06-04 11:40:27.555116",
-    "modified_by": "Administrator",
-    "module": "Urbanizaciones",
-    "name": "Configuracion de Urbanizacion",
-    "naming_rule": "By \"Naming Series\" field",
-    "owner": "Administrator",
-    "permissions": [
-        {
-            "create": 1,
-            "delete": 1,
-            "email": 1,
-            "print": 1,
-            "read": 1,
-            "role": "System Manager",
-            "share": 1,
-            "write": 1
-        }
-    ],
-    "sort_field": "modified",
-    "sort_order": "DESC",
-    "states": []
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2025-09-16 19:47:13.057816",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "tab_break_1",
+  "item_cuota",
+  "interes_anual",
+  "column_break_1",
+  "item_mora",
+  "mora_diaria",
+  "column_break_2",
+  "item_adelantos",
+  "vencimiento_cuota",
+  "naming_series"
+ ],
+ "fields": [
+  {
+   "description": "Debe elegir un producto de tipo servicio que se usara al momento de generar la factura incluyendo montos cobrados como adelanto.",
+   "fieldname": "item_adelantos",
+   "fieldtype": "Link",
+   "label": "Item a facturar como adelantos",
+   "options": "Item"
+  },
+  {
+   "description": "Porcentaje anual. Ej.: 10 = 10%.",
+   "fieldname": "interes_anual",
+   "fieldtype": "Percent",
+   "label": "Interes anual"
+  },
+  {
+   "description": "Porcentaje diario. Ej.: 0.05 = 0.05% por d\u00eda.",
+   "fieldname": "mora_diaria",
+   "fieldtype": "Percent",
+   "label": "Mora diaria"
+  },
+  {
+   "description": "Debes seleccionar el dia del mes que quieres usar para asignar como fecha de l\u00edmite de vencimiento en el pago de cada mes.",
+   "fieldname": "vencimiento_cuota",
+   "fieldtype": "Select",
+   "label": "Fecha de vencimiento mensual",
+   "options": "\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10\n11\n12\n13\n14\n15\n16\n17\n18\n19\n20\n21\n22\n23\n24\n25\n26\n27\n28"
+  },
+  {
+   "description": "Debe elegir un producto de tipo servicio que se usara al momento de generar la factura por las cuotas cancedas.",
+   "fieldname": "item_cuota",
+   "fieldtype": "Link",
+   "label": "Item a facturar como Cuota",
+   "options": "Item"
+  },
+  {
+   "description": "Debe elegir un producto de tipo servicio que se usara al momento de generar la factura agregando el valor de mora.",
+   "fieldname": "item_mora",
+   "fieldtype": "Link",
+   "label": "Item a facturar como Mora",
+   "options": "Item"
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Series",
+   "options": "CONF-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "tab_break_1",
+   "fieldtype": "Tab Break",
+   "label": "Par\u00e1metros"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-09-02 00:29:58.800076",
+ "modified_by": "Administrator",
+ "module": "Urbanizaciones",
+ "name": "Configuracion de Urbanizacion",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "print": 1,
+   "read": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
 }

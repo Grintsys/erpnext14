@@ -15,6 +15,13 @@
   "date_quote_financing",
   "total_cuota",
   "total_mora",
+  "total_a_pagar",
+  "column_break_6dnb2",
+  "monto_recibido",
+  "vuelto",
+  "aplicar",
+  "monto_adelanto",
+  "total_facturar",
   "amended_from"
  ],
  "fields": [
@@ -78,12 +85,51 @@
    "label": "Perfil POS",
    "options": "POS Profile",
    "reqd": 1
+  },
+  {
+   "fieldname": "total_a_pagar",
+   "fieldtype": "Currency",
+   "label": "Total a pagar",
+   "read_only": 1
+  },
+  {
+   "fieldname": "monto_recibido",
+   "fieldtype": "Currency",
+   "label": "Monto recibido"
+  },
+  {
+   "fieldname": "vuelto",
+   "fieldtype": "Currency",
+   "label": "Diferencia",
+   "read_only": 1
+  },
+  {
+   "fieldname": "aplicar",
+   "fieldtype": "Select",
+   "label": "Aplicar",
+   "options": "\nAbona a siguiente cuota\nAbono a Capital\nAbono a Intereses"
+  },
+  {
+   "fieldname": "monto_adelanto",
+   "fieldtype": "Currency",
+   "label": "Monto de adelanto",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_facturar",
+   "fieldtype": "Currency",
+   "label": "Total a facturar",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_6dnb2",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-06-04 11:41:15.514750",
+ "modified": "2026-09-02 00:51:06.367594",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Generar Factura",

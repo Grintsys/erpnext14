@@ -16,9 +16,19 @@
   "notas",
   "numero_cuota",
   "saldo_anterior",
-  "mora"
+  "mora",
+  "monto_adelantado"
  ],
  "fields": [
+  {
+   "default": "0",
+   "fieldname": "monto_adelantado",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Monto adelantado",
+   "no_copy": 1,
+   "read_only": 1
+  },
   {
    "fieldname": "numero_cuota",
    "fieldtype": "Int",

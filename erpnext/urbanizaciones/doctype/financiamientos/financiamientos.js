@@ -92,6 +92,20 @@ frappe.ui.form.on('Financiamientos', {
         const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
         const lockField = (frm.doc.es_refinanciamiento === 'Si') || hasCuotas;
         frm.set_df_property('es_refinanciamiento', 'read_only', lockField ? 1 : 0);
+
+        // Botón para abrir "Generar Factura" en una NUEVA pestaña del navegador
+        if (!frm.is_new() && hasCuotas) {
+            frm.add_custom_button(__('Generar Factura'), function() {
+                if (frm.is_dirty()) {
+                    frappe.show_alert({ message: __('Guarde los cambios antes de abrir Generar Factura'), indicator: 'warning' });
+                    return;
+                }
+                let url = frappe.urllib.get_full_url(
+                    `/app/generar-factura/new-generar-factura-1?customer=${encodeURIComponent(frm.doc.customer || '')}&financiamiento=${encodeURIComponent(frm.doc.name || '')}`
+                );
+                window.open(url, '_blank');
+            });
+        }
     },
 
     es_refinanciamiento: function(frm) {

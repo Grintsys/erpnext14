@@ -457,13 +457,13 @@ class SalesInvoice(SellingController):
 			return
 		
 		financiamiento = frappe.get_doc(
-            "Financiamientos",
-            generar_factura.financiamiento
-        )
+			"Financiamientos",
+			generar_factura.financiamiento
+		)
 
 		fecha_cuota = getdate(
-            generar_factura.date_quote_financing
-        )
+			generar_factura.date_quote_financing
+		)
 
 		cuota_encontrada = False
 
@@ -473,52 +473,154 @@ class SalesInvoice(SellingController):
 				and cuota.status == "Pendiente"
 			):
 
-				total_esperado = round(
-					flt(cuota.total_cuota) + flt(cuota.mora),
-					2
-				)
+				net_cuota_pendiente = flt(cuota.total_cuota) - flt(getattr(cuota, "monto_adelantado", 0.0))
+				if net_cuota_pendiente < 0:
+					net_cuota_pendiente = 0.0
 
-				paid_amount = round(
-					flt(self.paid_amount),
-					2
-				)
+				monto_recibido_gf = flt(getattr(generar_factura, "monto_recibido", 0.0))
+				total_a_pagar_esperado = net_cuota_pendiente + flt(cuota.mora)
 
-				if paid_amount != total_esperado:
+				es_pago_parcial = (monto_recibido_gf > 0) and (monto_recibido_gf < total_a_pagar_esperado)
+
+				monto_adelanto_sig = 0.0
+				if es_pago_parcial:
+					total_esperado = round(monto_recibido_gf, 2)
+				else:
+					if getattr(generar_factura, "abonar_siguiente_cuota", 0) and flt(getattr(generar_factura, "monto_adelanto", 0.0)) > 0:
+						monto_adelanto_sig = flt(generar_factura.monto_adelanto)
+					total_esperado = round(net_cuota_pendiente + flt(cuota.mora) + monto_adelanto_sig, 2)
+
+				# En ERPNext POS, cuando hay vuelto/cambio o redondeo de centavos:
+				total_cobrado = round(flt(self.paid_amount) + flt(self.change_amount), 2)
+				total_factura = round(flt(self.grand_total) + flt(self.change_amount), 2)
+				direct_paid = round(flt(self.paid_amount), 2)
+
+				diff_cobrado = abs(total_cobrado - total_esperado)
+				diff_factura = abs(total_factura - total_esperado)
+				diff_direct = abs(direct_paid - total_esperado)
+
+				if diff_cobrado > 0.05 and diff_factura > 0.05 and diff_direct > 0.05:
 					frappe.throw(
 						_(
 							"El total de la factura debe ser exactamente {0}. "
-							"Total factura: {1}"
+							"Total cobrado en factura: {1}"
 						).format(
 							total_esperado,
-							paid_amount
+							total_cobrado if total_cobrado > 0 else direct_paid
 						)
 					)
 
-				# Actualizar directamente la fila hija
-				frappe.db.set_value(
-					"Cuota de financiamiento",
-					cuota.name,
-					"status",
-					"Pagado",
-					update_modified=False
-				)
+				if es_pago_parcial:
+					# Pago parcial de la cuota actual: NO marcar como Pagado. Acumular en monto_adelantado
+					prev_adelantado = flt(getattr(cuota, "monto_adelantado", 0.0))
+					nuevo_adelantado = prev_adelantado + monto_recibido_gf
+					frappe.db.set_value(
+						"Cuota de financiamiento",
+						cuota.name,
+						"monto_adelantado",
+						nuevo_adelantado,
+						update_modified=False
+					)
 
-				nuevo_saldo = flt(financiamiento.saldo_actual) - total_esperado
+					nota_adelanto = f"Se aplicó abono parcial/adelantado de L {monto_recibido_gf} desde factura {self.name}."
+					nota_existente = cstr(cuota.notas).strip()
+					nueva_nota = f"{nota_existente}\n{nota_adelanto}".strip() if nota_existente else nota_adelanto
+					frappe.db.set_value(
+						"Cuota de financiamiento",
+						cuota.name,
+						"notas",
+						nueva_nota,
+						update_modified=False
+					)
 
-				if nuevo_saldo < 0:
-					nuevo_saldo = 0
+					if nuevo_adelantado >= flt(cuota.total_cuota):
+						frappe.db.set_value(
+							"Cuota de financiamiento",
+							cuota.name,
+							"status",
+							"Pagado",
+							update_modified=False
+						)
 
-				frappe.db.set_value(
-					"Financiamientos",
-					financiamiento.name,
-					"saldo_actual",
-					nuevo_saldo,
-					update_modified=False
-				)
+					nuevo_saldo = flt(financiamiento.saldo_actual) - monto_recibido_gf
+					if nuevo_saldo < 0:
+						nuevo_saldo = 0
+
+					frappe.db.set_value(
+						"Financiamientos",
+						financiamiento.name,
+						"saldo_actual",
+						nuevo_saldo,
+						update_modified=False
+					)
+
+				else:
+					# Pago completo de la cuota actual
+					frappe.db.set_value(
+						"Cuota de financiamiento",
+						cuota.name,
+						"status",
+						"Pagado",
+						update_modified=False
+					)
+
+					nuevo_saldo = flt(financiamiento.saldo_actual) - (net_cuota_pendiente + flt(cuota.mora))
+					if nuevo_saldo < 0:
+						nuevo_saldo = 0
+
+					frappe.db.set_value(
+						"Financiamientos",
+						financiamiento.name,
+						"saldo_actual",
+						nuevo_saldo,
+						update_modified=False
+					)
+
+					# Aplicar adelanto a la siguiente cuota si corresponde
+					if monto_adelanto_sig > 0:
+						siguiente_cuota_target = None
+						for sig in financiamiento.cuotas[index + 1:]:
+							if sig.status == "Pendiente":
+								siguiente_cuota_target = sig
+								break
+
+						if siguiente_cuota_target:
+							prev_adelantado = flt(getattr(siguiente_cuota_target, "monto_adelantado", 0.0))
+							nuevo_adelantado = prev_adelantado + monto_adelanto_sig
+							frappe.db.set_value(
+								"Cuota de financiamiento",
+								siguiente_cuota_target.name,
+								"monto_adelantado",
+								nuevo_adelantado,
+								update_modified=False
+							)
+
+							nota_adelanto = f"Se aplicó abono adelantado de L {monto_adelanto_sig} desde factura {self.name}."
+							nota_existente = cstr(siguiente_cuota_target.notas).strip()
+							nueva_nota = f"{nota_existente}\n{nota_adelanto}".strip() if nota_existente else nota_adelanto
+							frappe.db.set_value(
+								"Cuota de financiamiento",
+								siguiente_cuota_target.name,
+								"notas",
+								nueva_nota,
+								update_modified=False
+							)
+
+							if nuevo_adelantado >= flt(siguiente_cuota_target.total_cuota):
+								frappe.db.set_value(
+									"Cuota de financiamiento",
+									siguiente_cuota_target.name,
+									"status",
+									"Pagado",
+									update_modified=False
+								)
+
 
 				siguiente_fecha = None
 
-				for siguiente_cuota in financiamiento.cuotas[index + 1:]:
+				# Buscar la siguiente fecha de cuota que permanezca Pendiente
+				financiamiento_reloaded = frappe.get_doc("Financiamientos", financiamiento.name)
+				for siguiente_cuota in financiamiento_reloaded.cuotas:
 					if siguiente_cuota.status == "Pendiente":
 						siguiente_fecha = siguiente_cuota.fecha_vencimiento_cuota
 						break
@@ -531,20 +633,21 @@ class SalesInvoice(SellingController):
 						"fecha_vencimiento_cuota",
 						siguiente_fecha,
 						update_modified=False
-					)				
+					)
 
 				cuota_encontrada = True
 				break
 
 		if not cuota_encontrada:
 			frappe.throw(
-                f"No se encontró una cuota pendiente con fecha {fecha_cuota}"
-            )
+				f"No se encontró una cuota pendiente con fecha {fecha_cuota}"
+			)
 
 		frappe.msgprint(
 			f"Cuota con fecha de vencimiento {cuota.fecha_vencimiento_cuota} "
 			f"del financiamiento {financiamiento.name} marcada como pagada."
 		)
+
 
 	def assign_cai(self):
 		user = frappe.session.user
