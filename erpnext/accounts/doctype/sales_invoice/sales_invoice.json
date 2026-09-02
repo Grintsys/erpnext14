@@ -89,6 +89,7 @@
   "taxed_amount_15",
   "taxed_amount_18",
   "exempt_amount",
+  "exonerated_amount",
   "isv_15",
   "isv_18",
   "column_break5",
@@ -2264,6 +2265,11 @@
    "fieldtype": "Date",
    "label": "Fecha de cuota",
    "read_only": 1
+  },
+  {
+   "fieldname": "exonerated_amount",
+   "fieldtype": "Currency",
+   "label": "Exonerated Amount"
   }
  ],
  "icon": "fa fa-file-text",
@@ -2276,7 +2282,7 @@
    "link_fieldname": "consolidated_invoice"
   }
  ],
- "modified": "2026-06-02 21:36:58.761714",
+ "modified": "2026-09-01 18:33:20.552537",
  "modified_by": "Administrator",
  "module": "Accounts",
  "name": "Sales Invoice",

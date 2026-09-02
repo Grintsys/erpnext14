@@ -971,8 +971,112 @@ frappe.ui.form.on('Sales Invoice', {
 			method: "erpnext.accounts.doctype.sales_invoice.sales_invoice.create_dunning",
 			frm: frm
 		});
+	},
+
+	calculate_taxes_and_totals: function(frm) {
+		consolidate_honduras_totals(frm);
 	}
 });
+
+var consolidate_honduras_totals = function(frm) {
+	if (!frm || !frm.doc) return;
+
+	let doc = frm.doc;
+	let taxed_amount_15 = 0.0;
+	let isv_15 = 0.0;
+	let taxed_amount_18 = 0.0;
+	let isv_18 = 0.0;
+	let exempt_amount = 0.0;
+
+	let item_tax_rates = {};
+	let item_tax_amounts = {};
+
+	(doc.taxes || []).forEach(function(tax) {
+		let tax_detail = tax.item_wise_tax_detail;
+		if (typeof tax_detail === "string" && tax_detail.trim()) {
+			try {
+				tax_detail = JSON.parse(tax_detail);
+			} catch (e) {
+				tax_detail = {};
+			}
+		}
+		tax_detail = tax_detail || {};
+
+		Object.keys(tax_detail).forEach(function(item_key) {
+			let detail = tax_detail[item_key];
+			if (Array.isArray(detail) && detail.length >= 2) {
+				let rate = flt(detail[0]);
+				let tax_amt = flt(detail[1]);
+
+				if (item_tax_rates[item_key] === undefined) {
+					item_tax_rates[item_key] = 0.0;
+				}
+				item_tax_rates[item_key] += rate;
+
+				if (!item_tax_amounts[item_key]) {
+					item_tax_amounts[item_key] = {};
+				}
+				item_tax_amounts[item_key][rate] = (item_tax_amounts[item_key][rate] || 0.0) + tax_amt;
+			}
+		});
+	});
+
+	(doc.items || []).forEach(function(item) {
+		let key = item.name || item.item_code;
+		let net_amt = flt(item.net_amount);
+
+		let rate = 0.0;
+		if (item_tax_rates[key] !== undefined) {
+			rate = item_tax_rates[key];
+		} else if (item.item_tax_rate) {
+			let tax_map = item.item_tax_rate;
+			if (typeof tax_map === "string" && tax_map.trim()) {
+				try {
+					tax_map = JSON.parse(tax_map);
+				} catch (e) {
+					tax_map = {};
+				}
+			}
+			tax_map = tax_map || {};
+			Object.values(tax_map).forEach(function(r) {
+				rate += flt(r);
+			});
+		}
+
+		if (Math.abs(rate - 15.0) < 0.01) {
+			taxed_amount_15 += net_amt;
+			let tax_amt = (item_tax_amounts[key] && item_tax_amounts[key][15.0] !== undefined)
+				? item_tax_amounts[key][15.0]
+				: (net_amt * 0.15);
+			isv_15 += tax_amt;
+		} else if (Math.abs(rate - 18.0) < 0.01) {
+			taxed_amount_18 += net_amt;
+			let tax_amt = (item_tax_amounts[key] && item_tax_amounts[key][18.0] !== undefined)
+				? item_tax_amounts[key][18.0]
+				: (net_amt * 0.18);
+			isv_18 += tax_amt;
+		} else if (Math.abs(rate) < 0.01) {
+			exempt_amount += net_amt;
+		}
+	});
+
+	let p15 = precision("taxed_amount_15", doc) || 2;
+	let p18 = precision("taxed_amount_18", doc) || 2;
+	let p_ex = precision("exempt_amount", doc) || 2;
+
+	frm.set_value("taxed_amount_15", flt(taxed_amount_15, p15), null, true);
+	frm.set_value("isv_15", flt(isv_15, p15), null, true);
+	frm.set_value("taxed_amount_18", flt(taxed_amount_18, p18), null, true);
+	frm.set_value("isv_18", flt(isv_18, p18), null, true);
+	frm.set_value("exempt_amount", flt(exempt_amount, p_ex), null, true);
+
+	frm.refresh_field("taxed_amount_15");
+	frm.refresh_field("isv_15");
+	frm.refresh_field("taxed_amount_18");
+	frm.refresh_field("isv_18");
+	frm.refresh_field("exempt_amount");
+};
+
 
 frappe.ui.form.on("Sales Invoice Timesheet", {
 	timesheets_remove(frm) {

@@ -2,6 +2,7 @@
 # License: GNU General Public License v3. See license.txt
 
 
+import json
 from datetime import datetime, timedelta, date
 from erpnext.urbanizaciones.doctype.generar_factura import generar_factura
 import frappe
@@ -107,6 +108,7 @@ class SalesInvoice(SellingController):
 			self.so_dn_required()
 		
 		self.validate_id_disable_rounded_total()
+		self.get_itemised_tax_info()
 
 		self.set_tax_withholding()
 
@@ -189,35 +191,85 @@ class SalesInvoice(SellingController):
 		self.reset_default_field_value("set_warehouse", "items", "warehouse")
 
 	def get_itemised_tax_info(self):
-		self.taxed_amount_15 = 0
-		self.isv_15 = 0
-		self.taxed_amount_18 = 0
-		self.isv_18 = 0
-		self.exempt_amount = 0
+		self.taxed_amount_15 = 0.0
+		self.isv_15 = 0.0
+		self.taxed_amount_18 = 0.0
+		self.isv_18 = 0.0
+		self.exempt_amount = 0.0
 
-		for item in self.items:
-			item_all_data = frappe.get_doc("Item", item.item_code)
+		item_tax_rates = {}
+		item_tax_amounts = {}
 
-			for tax_detail in item_all_data.taxes:	
-				tax_template = frappe.get_doc("Item Tax Template", tax_detail.item_tax_template)			
-				for taxitem in tax_template.taxes:
-					if tax_template.selling:
-						if(taxitem.tax_rate == 15):
-							# self.taxed_amount_15 += item.amount - (item.amount*(taxitem.tax_rate/100))
-							# self.isv_15 += item.amount*(taxitem.tax_rate/100)
+		for tax in (self.get("taxes") or []):
+			tax_detail = tax.item_wise_tax_detail
+			if isinstance(tax_detail, str) and tax_detail.strip():
+				try:
+					tax_detail = json.loads(tax_detail)
+				except Exception:
+					tax_detail = {}
+			elif not isinstance(tax_detail, dict):
+				tax_detail = {}
 
-							self.taxed_amount_15 += (item.amount)/1.15
-							self.isv_15 += item.amount - (item.amount/1.15)
+			for item_key, detail in tax_detail.items():
+				if isinstance(detail, (list, tuple)) and len(detail) >= 2:
+					rate = flt(detail[0])
+					tax_amt = flt(detail[1])
 
-						if(taxitem.tax_rate == 18):
-							# self.taxed_amount_18 += item.amount - (item.amount*(taxitem.tax_rate/100))
-							# self.isv_18 += item.amount*(taxitem.tax_rate/100)
+					item_tax_rates[item_key] = item_tax_rates.get(item_key, 0.0) + rate
+					if item_key not in item_tax_amounts:
+						item_tax_amounts[item_key] = {}
+					item_tax_amounts[item_key][rate] = item_tax_amounts[item_key].get(rate, 0.0) + tax_amt
 
-							self.taxed_amount_18 += (item.amount)/1.18
-							self.isv_18 += item.amount - (item.amount/1.18)
+		for item in (self.get("items") or []):
+			net_amt = flt(item.net_amount)
 
-						if(taxitem.tax_rate == 0):
-							self.exempt_amount += item.amount
+			rate = 0.0
+			key = None
+			if item.name and item.name in item_tax_rates:
+				key = item.name
+				rate = item_tax_rates[item.name]
+			elif item.item_code and item.item_code in item_tax_rates:
+				key = item.item_code
+				rate = item_tax_rates[item.item_code]
+			elif item.item_tax_rate:
+				tax_map = item.item_tax_rate
+				if isinstance(tax_map, str) and tax_map.strip():
+					try:
+						tax_map = json.loads(tax_map)
+					except Exception:
+						tax_map = {}
+				elif not isinstance(tax_map, dict):
+					tax_map = {}
+
+				rate = sum(flt(r) for r in tax_map.values())
+
+			if abs(rate - 15.0) < 0.01:
+				self.taxed_amount_15 += net_amt
+				tax_amt = item_tax_amounts.get(key, {}).get(15.0, net_amt * 0.15) if key else (net_amt * 0.15)
+				self.isv_15 += tax_amt
+			elif abs(rate - 18.0) < 0.01:
+				self.taxed_amount_18 += net_amt
+				tax_amt = item_tax_amounts.get(key, {}).get(18.0, net_amt * 0.18) if key else (net_amt * 0.18)
+				self.isv_18 += tax_amt
+			elif abs(rate) < 0.01:
+				self.exempt_amount += net_amt
+
+
+		p15 = self.precision("taxed_amount_15")
+		p15 = p15 if p15 and p15 > 0 else 2
+
+		p18 = self.precision("taxed_amount_18")
+		p18 = p18 if p18 and p18 > 0 else 2
+
+		p_ex = self.precision("exempt_amount")
+		p_ex = p_ex if p_ex and p_ex > 0 else 2
+
+		self.taxed_amount_15 = flt(self.taxed_amount_15, p15)
+		self.isv_15 = flt(self.isv_15, p15)
+		self.taxed_amount_18 = flt(self.taxed_amount_18, p18)
+		self.isv_18 = flt(self.isv_18, p18)
+		self.exempt_amount = flt(self.exempt_amount, p_ex)
+
 
 	def validate_accounts(self):
 		self.validate_write_off_account()
