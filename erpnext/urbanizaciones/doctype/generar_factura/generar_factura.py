@@ -372,3 +372,45 @@ def get_financiamientos(customer):
     )
 
     return financiamientos
+
+
+@frappe.whitelist()
+def get_pending_quota_details(financiamiento):
+    """Obtiene los detalles de la cuota pendiente para un financiamiento en tiempo real"""
+    if not financiamiento:
+        return {}
+
+    financiamiento_doc = frappe.get_doc("Financiamientos", financiamiento)
+
+    cuotas_pendientes = sorted(
+        [
+            cuota
+            for cuota in financiamiento_doc.cuotas
+            if cuota.status == "Pendiente"
+        ],
+        key=lambda x: (
+            x.fecha_vencimiento_cuota,
+            x.numero_cuota
+        )
+    )
+
+    if not cuotas_pendientes:
+        return {}
+
+    cuota = cuotas_pendientes[0]
+    net_cuota = flt(cuota.total_cuota) - flt(getattr(cuota, "monto_adelantado", 0.0))
+    if net_cuota < 0:
+        net_cuota = 0.0
+
+    total_mora = flt(cuota.mora)
+    total_a_pagar = net_cuota + total_mora
+
+    return {
+        "customer": financiamiento_doc.customer,
+        "date_quote_financing": cuota.fecha_vencimiento_cuota,
+        "total_cuota": net_cuota,
+        "total_mora": total_mora,
+        "total_a_pagar": total_a_pagar,
+        "cuota_numero": cuota.numero_cuota
+    }
+
