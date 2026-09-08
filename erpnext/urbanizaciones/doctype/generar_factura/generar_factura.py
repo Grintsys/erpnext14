@@ -7,6 +7,16 @@ from frappe.model.document import Document
 from frappe.utils import today, flt
 
 
+def get_pos_payment_amount(invoice):
+    """Return the exact POS payment amount after ERPNext has calculated invoice totals."""
+    if getattr(invoice, "disable_rounded_total", False):
+        total = invoice.grand_total
+    else:
+        total = getattr(invoice, "rounded_total", 0) or invoice.grand_total
+
+    return flt(total, invoice.precision("paid_amount"))
+
+
 class GenerarFactura(Document):
 
     def validate(self):
@@ -284,12 +294,11 @@ class GenerarFactura(Document):
         if hasattr(invoice, "financiamiento"):
             invoice.financiamiento = financiamiento.name
 
-        total_a_facturar_monto = net_cuota_a_facturar + flt(cuota.mora) + monto_adelanto_aplicar
         if pos_profile.payments:
             default_payment = next((p for p in pos_profile.payments if p.default), pos_profile.payments[0])
             invoice.append("payments", {
                 "mode_of_payment": default_payment.mode_of_payment,
-                "amount": total_a_facturar_monto,
+                "amount": 0,
                 "default": 1
             })
 
@@ -297,6 +306,25 @@ class GenerarFactura(Document):
         # GUARDAR Y SOMETER FACTURA
         # ==========================
         invoice.insert(ignore_permissions=True)
+
+        # ERPNext applies the POS profile and calculates the final totals during insert.
+        # Synchronize the payment afterwards so disabled rounding preserves all cents.
+        default_payment = next((payment for payment in invoice.payments if payment.default), None)
+        if not default_payment:
+            frappe.throw(_("La factura POS no tiene un modo de pago predeterminado."))
+
+        default_payment.amount = get_pos_payment_amount(invoice)
+        invoice.save(ignore_permissions=True)
+
+        outstanding_amount = flt(invoice.outstanding_amount, invoice.precision("outstanding_amount"))
+        if outstanding_amount != 0:
+            frappe.throw(
+                _(
+                    "El pago POS no coincide con el total de la factura. "
+                    "Revise el perfil POS y los montos antes de continuar."
+                )
+            )
+
         invoice.submit()
 
 
@@ -413,4 +441,3 @@ def get_pending_quota_details(financiamiento):
         "total_a_pagar": total_a_pagar,
         "cuota_numero": cuota.numero_cuota
     }
-
