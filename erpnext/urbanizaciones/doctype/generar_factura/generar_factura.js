@@ -1,8 +1,24 @@
 // Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 // For license information, please see license.txt
 
+function setup_financiamiento_query(frm) {
+    frm.set_query('financiamiento', function() {
+        let filters = {
+            status: ['Activo', 'Refinanciado']
+        };
+        if (frm.doc.customer) {
+            filters.customer = frm.doc.customer;
+        }
+        return {
+            query: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.financiamiento_query',
+            filters: filters
+        };
+    });
+}
+
 frappe.ui.form.on('Generar Factura', {
     refresh: function(frm) {
+        setup_financiamiento_query(frm);
         if (frm.doc.docstatus === 0 && frm.doc.financiamiento && !frm.doc.total_a_pagar) {
             fetch_pending_quota(frm);
         } else {
@@ -10,6 +26,7 @@ frappe.ui.form.on('Generar Factura', {
         }
     },
     onload: function(frm) {
+        setup_financiamiento_query(frm);
         if (frm.doc.docstatus === 0 && frm.doc.financiamiento) {
             fetch_pending_quota(frm);
         }
@@ -43,31 +60,8 @@ frappe.ui.form.on('Generar Factura', {
         calculate_payment_totals(frm);
     },
     customer: function(frm) {
-        // Limpia el campo de financiamiento cuando cambia el cliente
         frm.set_value('financiamiento', '');
-        
-        // Actualiza las opciones del campo financiamiento
-        if (frm.doc.customer) {
-            frappe.call({
-                method: 'erpnext.urbanizaciones.doctype.generar_factura.generar_factura.get_financiamientos',
-                args: {
-                    customer: frm.doc.customer
-                },
-                callback: function(r) {
-                    if (r.message) {
-                        // Actualiza el filtro del campo
-                        frm.fields_dict.financiamiento.get_query = function() {
-                            return {
-                                filters: {
-                                    "customer": frm.doc.customer,
-                                    "status": ["in", ["Activo", "Refinanciado"]]
-                                }
-                            };
-                        };
-                    }
-                }
-            });
-        }
+        setup_financiamiento_query(frm);
     }
 });
 

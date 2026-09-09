@@ -269,6 +269,7 @@
    "write": 1
   }
  ],
+ "search_fields": "customer, urbanizaciones, activos",
  "sort_field": "modified",
  "sort_order": "DESC",
  "states": [],

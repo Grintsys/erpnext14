@@ -264,3 +264,68 @@ def update_overdue_mora():
         frappe.db.commit()
     except Exception:
         frappe.log_error(frappe.get_traceback(), 'update_overdue_mora')
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def financiamiento_query(doctype, txt, searchfield, start, page_len, filters):
+    if isinstance(filters, str):
+        import json
+        filters = json.loads(filters)
+    filters = filters or {}
+
+    conditions = []
+    values = {}
+
+    # Filtro por estado
+    if filters.get("status"):
+        status_val = filters.get("status")
+        if isinstance(status_val, (list, tuple)):
+            conditions.append("f.status IN %(status)s")
+            values["status"] = tuple(status_val)
+        else:
+            conditions.append("f.status = %(status)s")
+            values["status"] = status_val
+    else:
+        conditions.append("f.status IN ('Activo', 'Refinanciado')")
+
+    # Filtro por cliente
+    if filters.get("customer"):
+        conditions.append("f.customer = %(customer)s")
+        values["customer"] = filters.get("customer")
+
+    # Búsqueda por texto (txt)
+    if txt:
+        conditions.append("""(
+            f.name LIKE %(txt)s
+            OR f.customer LIKE %(txt)s
+            OR u.nombre_proyecto LIKE %(txt)s
+            OR a.descripcion_lote LIKE %(txt)s
+        )""")
+        values["txt"] = f"%{txt}%"
+        values["txt_start"] = f"{txt}%"
+    else:
+        values["txt_start"] = "%"
+
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+    query = f"""
+        SELECT
+            f.name,
+            COALESCE(NULLIF(f.customer, ''), ''),
+            COALESCE(NULLIF(u.nombre_proyecto, ''), f.urbanizaciones),
+            COALESCE(NULLIF(a.descripcion_lote, ''), f.activos)
+        FROM `tabFinanciamientos` f
+        LEFT JOIN `tabUrbanizaciones` u ON u.name = f.urbanizaciones
+        LEFT JOIN `tabActivos` a ON a.name = f.activos
+        WHERE {where_clause}
+        ORDER BY
+            (CASE WHEN f.name LIKE %(txt_start)s THEN 0 ELSE 1 END),
+            f.modified DESC
+        LIMIT %(start)s, %(page_len)s
+    """
+    values["start"] = int(start or 0)
+    values["page_len"] = int(page_len or 20)
+
+    return frappe.db.sql(query, values)
+
