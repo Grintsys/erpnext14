@@ -2,7 +2,13 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('Activos', {
-	// refresh: function(frm) {
-
-	// }
+    setup: function(frm) {
+        frm.set_query('centro_de_costo', function() {
+            return {
+                filters: {
+                    is_group: 0
+                }
+            };
+        });
+    }
 });

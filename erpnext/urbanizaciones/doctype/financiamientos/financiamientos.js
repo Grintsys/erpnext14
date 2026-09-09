@@ -10,6 +10,13 @@ frappe.ui.form.on('Financiamientos', {
                 }
             };
         });
+        frm.set_query('centro_costo', function() {
+            return {
+                filters: {
+                    is_group: 0
+                }
+            };
+        });
     },
 
     onload: function(frm)
@@ -21,12 +28,13 @@ frappe.ui.form.on('Financiamientos', {
         calculate_saldo_actual(frm);
     },
 
-    // add refresh to create the button and manage its state
     refresh: function(frm) {
-        // create the button once (always enabled)
-        if (!frm.__btn_generar) {
-            frm.__btn_generar = frm.add_custom_button(__('Generar cuotas'), function() {
-                // NOTE: button always enabled. If required data is missing, do nothing.
+        const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
+        const isDraft = frm.doc.docstatus === 0;
+
+        // Mostrar botón 'Generar cuotas' mientras el documento esté en Borrador (docstatus == 0)
+        if (isDraft) {
+            let btn = frm.add_custom_button(__('Generar cuotas'), function() {
                 const required_fields = [
                     'customer',
                     'urbanizaciones',
@@ -47,49 +55,57 @@ frappe.ui.form.on('Financiamientos', {
                     return v !== undefined && v !== null && v !== '' && !(typeof v === 'number' && isNaN(v));
                 });
 
-                // If basic required fields are not present, do nothing (silent)
                 if (!allFilled) {
                     frappe.show_alert({ message: __('Complete todos los campos requeridos para generar las cuotas'), indicator: 'red' });
                     return;
                 }
 
-                // prevent double click immediately
-                frm.__btn_generar.prop('disabled', true);
-
                 const call_generate = () => {
+                    btn.prop('disabled', true);
                     frappe.call({
                         method: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.generar_cuotas',
                         args: { docname: frm.doc.name },
+                        freeze: true,
+                        freeze_message: __('Generando cuotas de financiamiento...'),
                     }).then(() => {
                         frm.reload_doc();
-                        frappe.show_alert({ message: __('Cuotas generadas'), indicator: 'green' });
-                        // mark as generated to avoid duplicate generation
-                        frm.__cuotas_generadas = true;
-                        if (frm.__btn_generar) frm.__btn_generar.prop('disabled', true);
+                        frappe.show_alert({ message: __('Cuotas generadas exitosamente'), indicator: 'green' });
                     }).catch((err) => {
                         console.error(err);
-                        frappe.msgprint(__('Error generando cuotas'));
-                        // re-enable button on error
-                        if (frm.__btn_generar) frm.__btn_generar.prop('disabled', false);
+                        btn.prop('disabled', false);
                     });
                 };
 
-                // If the document is new or has unsaved changes, save it first so it exists in DB.
-                if (frm.is_new() || frm.is_dirty()) {
-                    frm.save().then(() => {
-                        call_generate();
-                    }).catch(() => {
-                        // save failed or was cancelled -> re-enable button
-                        if (frm.__btn_generar) frm.__btn_generar.prop('disabled', false);
-                    });
-                } else {
-                    call_generate();
-                }
+                const execute = () => {
+                    if (hasCuotas) {
+                        frappe.confirm(
+                            __('Ya existen cuotas generadas. ¿Desea regenerar el plan de pagos con los datos actuales?'),
+                            function() {
+                                if (frm.is_dirty()) {
+                                    frm.save().then(() => call_generate()).catch(() => btn.prop('disabled', false));
+                                } else {
+                                    call_generate();
+                                }
+                            }
+                        );
+                    } else {
+                        if (frm.is_new() || frm.is_dirty()) {
+                            frm.save().then(() => call_generate()).catch(() => btn.prop('disabled', false));
+                        } else {
+                            call_generate();
+                        }
+                    }
+                };
+
+                execute();
             });
+
+            if (!frm.is_new()) {
+                btn.addClass('btn-primary');
+            }
         }
 
         // lock 'es_refinanciamiento' if user selected "Si" or if cuotas already exist
-        const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
         const lockField = (frm.doc.es_refinanciamiento === 'Si') || hasCuotas;
         frm.set_df_property('es_refinanciamiento', 'read_only', lockField ? 1 : 0);
 
@@ -105,6 +121,23 @@ frappe.ui.form.on('Financiamientos', {
                 );
                 window.open(url, '_blank');
             });
+
+            frm.add_custom_button(__('Actualizar Políticas de Cobro'), function() {
+                frappe.confirm(
+                    __('¿Desea actualizar las políticas financieras de este contrato a la versión vigente en su Configuración de Urbanización?'),
+                    function() {
+                        frappe.call({
+                            method: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.adoptar_nuevas_politicas',
+                            args: { financiamiento_name: frm.doc.name },
+                            callback: function(r) {
+                                if (r.message && r.message.success) {
+                                    frm.reload_doc();
+                                }
+                            }
+                        });
+                    }
+                );
+            }, __('Acciones'));
         }
     },
 

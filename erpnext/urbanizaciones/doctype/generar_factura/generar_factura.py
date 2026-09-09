@@ -110,6 +110,11 @@ class GenerarFactura(Document):
             )
 
         # ==========================
+        # OBTENER POLÍTICAS DEL FINANCIAMIENTO
+        # ==========================
+        politicas = financiamiento.get_politicas_snapshot()
+
+        # ==========================
         # OBTENER CUOTA PENDIENTE
         # ==========================
         cuotas_pendientes = sorted(
@@ -139,20 +144,32 @@ class GenerarFactura(Document):
         total_a_pagar_esperado = net_cuota_pendiente + flt(cuota.mora)
         monto_recibido_val = flt(self.monto_recibido)
 
+        # Validar cobertura de mora exigida por política
+        if politicas.get("exigir_cobertura_mora", 1) == 1 and flt(cuota.mora) > 0:
+            if monto_recibido_val > 0 and monto_recibido_val < total_a_pagar_esperado:
+                frappe.throw(
+                    _("La política de la urbanización exige la cobertura completa de mora y cuota. No se permiten pagos parciales cuando existe mora pendiente.")
+                )
+
         es_pago_parcial = (monto_recibido_val > 0) and (monto_recibido_val < total_a_pagar_esperado)
+
+        if es_pago_parcial and politicas.get("permitir_pagos_parciales_sin_mora", 1) == 0:
+            frappe.throw(
+                _("La política del financiamiento no permite realizar pagos parciales.")
+            )
+
+        if monto_recibido_val > total_a_pagar_esperado and politicas.get("permitir_monto_mayor", 1) == 0:
+            frappe.throw(
+                _("La política del financiamiento no permite recibir montos superiores al total a pagar.")
+            )
 
         target_cuota_adelanto = None
         monto_adelanto_aplicar = 0.0
         net_cuota_a_facturar = net_cuota_pendiente
+        monto_abono_extraordinario = 0.0
+        tipo_abono_extraordinario = None
 
         if es_pago_parcial:
-            # Regla 0: No se permiten pagos parciales si hay mora pendiente
-            if flt(cuota.mora) > 0 or flt(self.get("total_mora")) > 0:
-                frappe.throw(
-                    _("No se permiten pagos parciales ni adelantados si existen cuotas pendientes con mora. Debe cancelar la mora y el total a pagar.")
-                )
-
-            # Regla de Pago Parcial: El dinero ingresado es un adelanto abonado a la cuota actual
             if not getattr(configuracion, "item_adelantos", None):
                 frappe.throw(
                     _("Debe configurar el Item a facturar como Adelantos en la Configuración de Urbanización.")
@@ -163,17 +180,38 @@ class GenerarFactura(Document):
             net_cuota_a_facturar = 0.0
 
         else:
-            # Pago completo de la cuota actual
-            if (self.get("aplicar") == "Abona a siguiente cuota" or self.get("abonar_siguiente_cuota") in ("Abona a siguiente cuota", "1", 1)) and flt(self.get("monto_adelanto")) > 0:
-                monto_adelanto_aplicar = flt(self.get("monto_adelanto"))
+            # Pago completo o excedente
+            excedente = monto_recibido_val - total_a_pagar_esperado if monto_recibido_val > total_a_pagar_esperado else 0.0
+            modo_aplicar = self.get("aplicar") or politicas.get("politica_excedentes")
 
-                # Regla 1: No se permiten adelantos si la cuota actual tiene mora
+            if excedente > 0:
+                if modo_aplicar == "Vuelto en caja":
+                    if politicas.get("permitir_vuelto_efectivo", 1) == 0:
+                        frappe.throw(_("La política del financiamiento no permite la devolución de vuelto en efectivo."))
+                elif modo_aplicar == "Abona a siguiente cuota":
+                    if politicas.get("permitir_anticipo_siguiente_cuota", 1) == 0:
+                        frappe.throw(_("La política del financiamiento no permite realizar anticipos a la siguiente cuota."))
+                    monto_adelanto_aplicar = excedente
+                elif modo_aplicar == "Abono a Capital":
+                    if politicas.get("permitir_abono_capital", 1) == 0:
+                        frappe.throw(_("La política del financiamiento no permite abonos extraordinarios a capital."))
+                    monto_abono_extraordinario = excedente
+                    tipo_abono_extraordinario = "Capital"
+                elif modo_aplicar == "Abono a Intereses":
+                    if politicas.get("permitir_abono_interes", 1) == 0:
+                        frappe.throw(_("La política del financiamiento no permite abonos extraordinarios a intereses."))
+                    monto_abono_extraordinario = excedente
+                    tipo_abono_extraordinario = "Intereses"
+
+            if (modo_aplicar == "Abona a siguiente cuota" or self.get("abonar_siguiente_cuota") in ("Abona a siguiente cuota", "1", 1)) and (monto_adelanto_aplicar > 0 or flt(self.get("monto_adelanto")) > 0):
+                if monto_adelanto_aplicar == 0:
+                    monto_adelanto_aplicar = flt(self.get("monto_adelanto"))
+
                 if flt(cuota.mora) > 0 or flt(self.get("total_mora")) > 0:
                     frappe.throw(
                         _("No se permite realizar pagos adelantados mientras existan cuotas pendientes con mora.")
                     )
 
-                # Regla 2: Buscar la siguiente cuota pendiente en secuencia
                 cuotas_futuras = sorted(
                     [
                         c for c in financiamiento.cuotas
@@ -190,14 +228,19 @@ class GenerarFactura(Document):
                 target_cuota_adelanto = cuotas_futuras[0]
                 saldo_pendiente_siguiente = flt(target_cuota_adelanto.total_cuota) - flt(getattr(target_cuota_adelanto, "monto_adelantado", 0.0))
 
-                # Regla 3: El adelanto no puede superar el saldo pendiente de la siguiente cuota
-                if monto_adelanto_aplicar > saldo_pendiente_siguiente:
+                regla_monto = politicas.get("regla_monto_siguiente_cuota", "Coincidencia Exacta")
+                if regla_monto == "Coincidencia Exacta":
+                    if abs(monto_adelanto_aplicar - saldo_pendiente_siguiente) > 0.01:
+                        frappe.throw(
+                            _("La política requiere coincidencia exacta con el monto de la siguiente cuota (L {0}). Para montos diferentes debe utilizar Abono a Capital.")
+                            .format(saldo_pendiente_siguiente)
+                        )
+                elif monto_adelanto_aplicar > saldo_pendiente_siguiente:
                     frappe.throw(
                         _("El monto del adelanto (L {0}) supera el saldo pendiente de la siguiente cuota (L {1}). Para montos superiores debe utilizarse Abono a Capital.")
                         .format(monto_adelanto_aplicar, saldo_pendiente_siguiente)
                     )
 
-                # Regla 4: Debe existir item_adelantos configurado
                 if not getattr(configuracion, "item_adelantos", None):
                     frappe.throw(
                         _("Debe configurar el Item a facturar como Adelantos en la Configuración de Urbanización.")
@@ -289,6 +332,20 @@ class GenerarFactura(Document):
             )
 
         # ==========================
+        # ITEM ABONO EXTRAORDINARIO (Capital o Intereses)
+        # ==========================
+        if monto_abono_extraordinario > 0 and tipo_abono_extraordinario:
+            if not getattr(configuracion, "item_adelantos", None):
+                frappe.throw(_("Debe configurar el Item a facturar como Adelantos en la Configuración de Urbanización."))
+
+            row = invoice.append("items", {})
+            row.item_code = configuracion.item_adelantos
+            row.qty = 1
+            row.rate = monto_abono_extraordinario
+            row.cost_center = financiamiento.centro_costo
+            row.description = f"Abono extraordinario a {tipo_abono_extraordinario}"
+
+        # ==========================
         # REFERENCIAS OPCIONALES Y MODO DE PAGO POS
         # ==========================
         if hasattr(invoice, "financiamiento"):
@@ -327,15 +384,24 @@ class GenerarFactura(Document):
 
         invoice.submit()
 
+        # ==========================
+        # EJECUTAR REAMORTIZACIÓN SI APLICA ABONO EXTRAORDINARIO
+        # ==========================
+        if monto_abono_extraordinario > 0 and tipo_abono_extraordinario:
+            financiamiento_reload = frappe.get_doc("Financiamientos", financiamiento.name)
+            if tipo_abono_extraordinario == "Capital":
+                financiamiento_reload.reamortizar_por_abono_capital(monto_abono_extraordinario)
+            elif tipo_abono_extraordinario == "Intereses":
+                financiamiento_reload.reamortizar_por_abono_interes(monto_abono_extraordinario)
+
 
 
 
         # ==========================
         # GUARDAR REFERENCIA
         # ==========================
-        if hasattr(cuota, "sales_invoice"):
-            cuota.sales_invoice = invoice.name
-            financiamiento.save(ignore_permissions=True)
+        if hasattr(cuota, "name") and cuota.name:
+            frappe.db.set_value("Cuota de financiamiento", cuota.name, "sales_invoice", invoice.name, update_modified=False)
 
         # ==========================
         # ACTUALIZAR DOCUMENTO
@@ -373,12 +439,12 @@ class GenerarFactura(Document):
         else:
             frappe.msgprint(
                 _(
-                    "Cuota #{0} del financiamiento {1} marcada como pagada.<br><br>"
-                    "<b>Factura {2} creada correctamente.</b>"
+                    "<b>Factura {0} creada y sometida correctamente.</b><br>"
+                    "Cobro procesado para la cuota #{1} del financiamiento {2}."
                 ).format(
+                    invoice.name,
                     cuota.numero_cuota,
-                    financiamiento.name,
-                    invoice.name
+                    financiamiento.name
                 )
             )
 

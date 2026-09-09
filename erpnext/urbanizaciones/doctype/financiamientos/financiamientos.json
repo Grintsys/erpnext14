@@ -19,6 +19,7 @@
   "status",
   "section_break_2",
   "configuracion_financiamiento",
+  "politicas_financieras_snapshot",
   "monto_contrato",
   "prima",
   "capital_financiado",
@@ -171,6 +172,15 @@
    "label": "Configuracion de financiamiento",
    "options": "Configuracion de Urbanizacion",
    "reqd": 1
+  },
+  {
+   "description": "Snapshot congelado de las pol\u00edticas financieras vigentes al momento de la contrataci\u00f3n.",
+   "fieldname": "politicas_financieras_snapshot",
+   "fieldtype": "Code",
+   "hidden": 1,
+   "label": "Snapshot de Pol\u00edticas Financieras",
+   "options": "JSON",
+   "read_only": 1
   },
   {
    "default": "0",

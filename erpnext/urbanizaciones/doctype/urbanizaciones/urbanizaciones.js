@@ -2,7 +2,13 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('Urbanizaciones', {
-	// refresh: function(frm) {
-
-	// }
+    setup: function(frm) {
+        frm.set_query('cost_center', function() {
+            return {
+                filters: {
+                    is_group: 0
+                }
+            };
+        });
+    }
 });

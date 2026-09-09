@@ -107,7 +107,7 @@
    "fieldname": "aplicar",
    "fieldtype": "Select",
    "label": "Aplicar",
-   "options": "\nAbona a siguiente cuota\nAbono a Capital\nAbono a Intereses"
+   "options": "\nVuelto en caja\nAbona a siguiente cuota\nAbono a Capital\nAbono a Intereses"
   },
   {
    "fieldname": "monto_adelanto",

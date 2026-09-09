@@ -126,18 +126,26 @@ function calculate_payment_totals(frm) {
     }
 
     let diferencia = monto_recibido - total_a_pagar;
-    let vuelto = diferencia > 0 ? diferencia : 0.0;
-
-    frm.set_value('vuelto', vuelto);
-
+    let vuelto = 0.0;
     let monto_adelanto = 0.0;
-    if (frm.doc.aplicar === 'Abona a siguiente cuota' && total_mora <= 0 && diferencia > 0) {
-        monto_adelanto = vuelto;
+
+    if (diferencia > 0) {
+        if (frm.doc.aplicar === 'Vuelto en caja') {
+            vuelto = diferencia;
+            monto_adelanto = 0.0;
+        } else if (frm.doc.aplicar === 'Abona a siguiente cuota' || frm.doc.aplicar === 'Abono a Capital' || frm.doc.aplicar === 'Abono a Intereses') {
+            vuelto = 0.0;
+            monto_adelanto = diferencia;
+        } else {
+            vuelto = diferencia;
+            monto_adelanto = 0.0;
+        }
     }
 
-    let total_facturar = (monto_recibido > 0) ? (total_a_pagar + monto_adelanto) : total_a_pagar;
-
+    frm.set_value('vuelto', vuelto);
     frm.set_value('monto_adelanto', monto_adelanto);
+
+    let total_facturar = (monto_recibido > 0) ? (total_a_pagar + monto_adelanto) : total_a_pagar;
     frm.set_value('total_facturar', total_facturar);
 }
 

@@ -17,7 +17,8 @@
   "numero_cuota",
   "saldo_anterior",
   "mora",
-  "monto_adelantado"
+  "monto_adelantado",
+  "sales_invoice"
  ],
  "fields": [
   {
@@ -63,12 +64,12 @@
    "reqd": 1
   },
   {
-   "allow_on_submit": 1,
    "default": "Pendiente",
    "fieldname": "status",
    "fieldtype": "Data",
    "in_list_view": 1,
    "label": "Estado de la cuota",
+   "read_only": 1,
    "reqd": 1
   },
   {
@@ -95,6 +96,13 @@
    "fieldtype": "Currency",
    "label": "Mora",
    "reqd": 1
+  },
+  {
+   "fieldname": "sales_invoice",
+   "fieldtype": "Link",
+   "label": "Factura",
+   "options": "Sales Invoice",
+   "read_only": 1
   }
  ],
  "index_web_pages_for_search": 1,

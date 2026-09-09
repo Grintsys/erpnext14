@@ -483,12 +483,17 @@ class SalesInvoice(SellingController):
 				es_pago_parcial = (monto_recibido_gf > 0) and (monto_recibido_gf < total_a_pagar_esperado)
 
 				monto_adelanto_sig = 0.0
+				modo_aplicar = getattr(generar_factura, "aplicar", None)
 				if es_pago_parcial:
 					total_esperado = round(monto_recibido_gf, 2)
 				else:
-					if getattr(generar_factura, "abonar_siguiente_cuota", 0) and flt(getattr(generar_factura, "monto_adelanto", 0.0)) > 0:
+					if modo_aplicar in ("Abona a siguiente cuota", "Abono a Capital", "Abono a Intereses") and monto_recibido_gf > total_a_pagar_esperado:
+						total_esperado = round(monto_recibido_gf, 2)
+					elif getattr(generar_factura, "abonar_siguiente_cuota", 0) and flt(getattr(generar_factura, "monto_adelanto", 0.0)) > 0:
 						monto_adelanto_sig = flt(generar_factura.monto_adelanto)
-					total_esperado = round(net_cuota_pendiente + flt(cuota.mora) + monto_adelanto_sig, 2)
+						total_esperado = round(net_cuota_pendiente + flt(cuota.mora) + monto_adelanto_sig, 2)
+					else:
+						total_esperado = round(total_a_pagar_esperado, 2)
 
 				# En ERPNext POS, cuando hay vuelto/cambio o redondeo de centavos:
 				total_cobrado = round(flt(self.paid_amount) + flt(self.change_amount), 2)
@@ -643,10 +648,11 @@ class SalesInvoice(SellingController):
 				f"No se encontró una cuota pendiente con fecha {fecha_cuota}"
 			)
 
-		frappe.msgprint(
-			f"Cuota con fecha de vencimiento {cuota.fecha_vencimiento_cuota} "
-			f"del financiamiento {financiamiento.name} marcada como pagada."
-		)
+		if not self.invoice_generate:
+			frappe.msgprint(
+				f"Cuota con fecha de vencimiento {cuota.fecha_vencimiento_cuota} "
+				f"del financiamiento {financiamiento.name} marcada como pagada."
+			)
 
 
 	def assign_cai(self):

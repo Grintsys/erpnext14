@@ -17,7 +17,23 @@
   "column_break_2",
   "item_adelantos",
   "vencimiento_cuota",
-  "naming_series"
+  "naming_series",
+  "section_break_politicas",
+  "exigir_cobertura_mora",
+  "permitir_pagos_parciales_sin_mora",
+  "column_break_pol_1",
+  "permitir_monto_mayor",
+  "permitir_vuelto_efectivo",
+  "politica_excedentes",
+  "section_break_anticipos",
+  "permitir_anticipo_siguiente_cuota",
+  "regla_monto_siguiente_cuota",
+  "section_break_abono_capital",
+  "permitir_abono_capital",
+  "politica_recalculo_capital",
+  "section_break_abono_interes",
+  "permitir_abono_interes",
+  "politica_recalculo_interes"
  ],
  "fields": [
   {
@@ -80,6 +96,100 @@
    "fieldname": "tab_break_1",
    "fieldtype": "Tab Break",
    "label": "Par\u00e1metros"
+  },
+  {
+   "fieldname": "section_break_politicas",
+   "fieldtype": "Section Break",
+   "label": "Pol\u00edticas Generales y Excedentes"
+  },
+  {
+   "default": "1",
+   "fieldname": "exigir_cobertura_mora",
+   "fieldtype": "Check",
+   "label": "Exigir Cobertura Completa de Mora"
+  },
+  {
+   "default": "1",
+   "fieldname": "permitir_pagos_parciales_sin_mora",
+   "fieldtype": "Check",
+   "label": "Permitir Pagos Parciales sin Mora"
+  },
+  {
+   "fieldname": "column_break_pol_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "default": "1",
+   "fieldname": "permitir_monto_mayor",
+   "fieldtype": "Check",
+   "label": "Permitir Monto Recibido Mayor al Total"
+  },
+  {
+   "default": "1",
+   "fieldname": "permitir_vuelto_efectivo",
+   "fieldtype": "Check",
+   "label": "Permitir Vuelto/Cambio en Caja"
+  },
+  {
+   "default": "Selecci\u00f3n por Usuario en Caja",
+   "fieldname": "politica_excedentes",
+   "fieldtype": "Select",
+   "label": "Pol\u00edtica Predeterminada de Excedentes",
+   "options": "Selecci\u00f3n por Usuario en Caja\nVuelto en Caja\nAbono a Siguiente Cuota\nAbono Extraordinario a Capital\nAbono Extraordinario a Intereses"
+  },
+  {
+   "fieldname": "section_break_anticipos",
+   "fieldtype": "Section Break",
+   "label": "Pol\u00edticas de Anticipo de Cuota"
+  },
+  {
+   "default": "1",
+   "fieldname": "permitir_anticipo_siguiente_cuota",
+   "fieldtype": "Check",
+   "label": "Permitir Anticipo de Siguiente Cuota"
+  },
+  {
+   "default": "Coincidencia Exacta",
+   "fieldname": "regla_monto_siguiente_cuota",
+   "fieldtype": "Select",
+   "label": "Regla de Monto para Anticipo",
+   "options": "Coincidencia Exacta\nHasta el Saldo Pendiente"
+  },
+  {
+   "fieldname": "section_break_abono_capital",
+   "fieldtype": "Section Break",
+   "label": "Abono Extraordinario a Capital"
+  },
+  {
+   "default": "1",
+   "fieldname": "permitir_abono_capital",
+   "fieldtype": "Check",
+   "label": "Permitir Abono Extraordinario a Capital"
+  },
+  {
+   "default": "Reducir Plazo (Cuota Fija)",
+   "fieldname": "politica_recalculo_capital",
+   "fieldtype": "Select",
+   "label": "M\u00e9todo de Reamortizaci\u00f3n a Capital",
+   "options": "Reducir Plazo (Cuota Fija)\nReducir Valor de Cuota (Plazo Fijo)"
+  },
+  {
+   "fieldname": "section_break_abono_interes",
+   "fieldtype": "Section Break",
+   "label": "Abono Extraordinario a Intereses"
+  },
+  {
+   "default": "1",
+   "fieldname": "permitir_abono_interes",
+   "fieldtype": "Check",
+   "label": "Permitir Abono Extraordinario a Intereses"
+  },
+  {
+   "default": "Cr\u00e9dito Directo Cuota Posterior",
+   "fieldname": "politica_recalculo_interes",
+   "fieldtype": "Select",
+   "label": "M\u00e9todo de Reamortizaci\u00f3n a Intereses",
+   "options": "Cr\u00e9dito Directo Cuota Posterior\nDescuento Prorrateado Futuro"
   }
  ],
  "index_web_pages_for_search": 1,

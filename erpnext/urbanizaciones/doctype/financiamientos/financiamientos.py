@@ -1,6 +1,7 @@
 # Copyright (c) 2025, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -60,7 +61,243 @@ def validate_required_fields(doc):
 class Financiamientos(Document):
     def validate(self):
         self.validate_activo_urbanizacion()
+        self.ensure_politicas_snapshot()
         self.calculate_financial_totals()
+
+    def ensure_politicas_snapshot(self):
+        if not self.politicas_financieras_snapshot and self.configuracion_financiamiento:
+            config_doc = frappe.get_doc("Configuracion de Urbanizacion", self.configuracion_financiamiento)
+            self.politicas_financieras_snapshot = json.dumps(config_doc.get_politicas_dict(), indent=2, ensure_ascii=False)
+
+    def get_politicas_snapshot(self):
+        if self.politicas_financieras_snapshot:
+            try:
+                return json.loads(self.politicas_financieras_snapshot)
+            except Exception:
+                pass
+        if self.configuracion_financiamiento:
+            try:
+                config_doc = frappe.get_doc("Configuracion de Urbanizacion", self.configuracion_financiamiento)
+                return config_doc.get_politicas_dict()
+            except Exception:
+                pass
+        return {
+            "exigir_cobertura_mora": 1,
+            "permitir_pagos_parciales_sin_mora": 1,
+            "permitir_monto_mayor": 1,
+            "permitir_vuelto_efectivo": 1,
+            "politica_excedentes": "Selección por Usuario en Caja",
+            "permitir_anticipo_siguiente_cuota": 1,
+            "regla_monto_siguiente_cuota": "Coincidencia Exacta",
+            "permitir_abono_capital": 1,
+            "politica_recalculo_capital": "Reducir Plazo (Cuota Fija)",
+            "permitir_abono_interes": 1,
+            "politica_recalculo_interes": "Crédito Directo Cuota Posterior",
+            "version_politica": "Fallback",
+        }
+
+    def reamortizar_por_abono_capital(self, monto_abono, politica=None):
+        """
+        Recalcula la tabla de amortización tras un abono extraordinario a capital.
+        - Las cuotas 'Pagado' se mantienen intactas.
+        - Reduce el saldo de capital por `monto_abono`.
+        - Si politica == 'Reducir Plazo (Cuota Fija)' (default):
+            Mantiene el valor de la cuota mensual fija (PMT) y cancela las cuotas finales sobrantes.
+        - Si politica == 'Reducir Valor de Cuota (Plazo Fijo)':
+            Recalcula un nuevo PMT menor manteniendo el número de cuotas pendientes.
+        """
+        import json
+        from decimal import Decimal, getcontext, ROUND_HALF_UP
+
+        getcontext().prec = 28
+        CENT = Decimal('0.01')
+
+        abono = Decimal(str(monto_abono or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+        if abono <= 0:
+            return
+
+        politicas = self.get_politicas_snapshot()
+        politica = politica or politicas.get("politica_recalculo_capital", "Reducir Plazo (Cuota Fija)")
+
+        cuotas_pendientes = [c for c in self.cuotas if c.status == "Pendiente"]
+        if not cuotas_pendientes:
+            return
+
+        first_pending = cuotas_pendientes[0]
+        saldo_anterior_base = Decimal(str(first_pending.saldo_anterior))
+        nuevo_saldo_base = (saldo_anterior_base - abono).quantize(CENT, rounding=ROUND_HALF_UP)
+        if nuevo_saldo_base < Decimal('0.00'):
+            nuevo_saldo_base = Decimal('0.00')
+
+        annual_interest = Decimal(str(self.interes_anual or 0))
+        r = (annual_interest / Decimal('100')) / Decimal('12') if annual_interest != 0 else Decimal('0')
+        n_rem = len(cuotas_pendientes)
+
+        if politica == "Reducir Valor de Cuota (Plazo Fijo)":
+            if n_rem > 0 and nuevo_saldo_base > 0:
+                if r == 0:
+                    new_pmt = (nuevo_saldo_base / n_rem).quantize(CENT, rounding=ROUND_HALF_UP)
+                else:
+                    new_pmt = (r * nuevo_saldo_base / (Decimal('1') - (Decimal('1') + r) ** (Decimal(-n_rem)))).quantize(CENT, rounding=ROUND_HALF_UP)
+            else:
+                new_pmt = Decimal('0.00')
+
+            curr_balance = nuevo_saldo_base
+            for idx, c in enumerate(cuotas_pendientes):
+                i = idx + 1
+                interest = (curr_balance * r).quantize(CENT, rounding=ROUND_HALF_UP)
+                if i == n_rem:
+                    principal = curr_balance
+                    this_payment = (principal + interest).quantize(CENT, rounding=ROUND_HALF_UP)
+                else:
+                    principal = (new_pmt - interest).quantize(CENT, rounding=ROUND_HALF_UP)
+                    this_payment = new_pmt
+
+                prev_b = curr_balance
+                curr_balance = (curr_balance - principal).quantize(CENT, rounding=ROUND_HALF_UP)
+                if curr_balance < 0:
+                    curr_balance = Decimal('0.00')
+
+                c.saldo_anterior = float(prev_b)
+                c.capital = float(principal)
+                c.intereses = float(interest)
+                c.total_cuota = float(this_payment)
+                c.saldo = float(curr_balance)
+
+        else: # "Reducir Plazo (Cuota Fija)"
+            fixed_pmt = Decimal(str(first_pending.total_cuota))
+            curr_balance = nuevo_saldo_base
+
+            for c in cuotas_pendientes:
+                if curr_balance <= 0:
+                    c.capital = 0.0
+                    c.intereses = 0.0
+                    c.total_cuota = 0.0
+                    c.saldo = 0.0
+                    c.saldo_anterior = 0.0
+                    c.status = "Cancelado"
+                    continue
+
+                interest = (curr_balance * r).quantize(CENT, rounding=ROUND_HALF_UP)
+                principal = (fixed_pmt - interest).quantize(CENT, rounding=ROUND_HALF_UP)
+
+                if principal >= curr_balance:
+                    principal = curr_balance
+                    this_payment = (principal + interest).quantize(CENT, rounding=ROUND_HALF_UP)
+                    prev_b = curr_balance
+                    curr_balance = Decimal('0.00')
+                    c.saldo_anterior = float(prev_b)
+                    c.capital = float(principal)
+                    c.intereses = float(interest)
+                    c.total_cuota = float(this_payment)
+                    c.saldo = 0.0
+                else:
+                    this_payment = fixed_pmt
+                    prev_b = curr_balance
+                    curr_balance = (curr_balance - principal).quantize(CENT, rounding=ROUND_HALF_UP)
+                    c.saldo_anterior = float(prev_b)
+                    c.capital = float(principal)
+                    c.intereses = float(interest)
+                    c.total_cuota = float(this_payment)
+                    c.saldo = float(curr_balance)
+
+        # Persistir cambios en cada fila de cuota en DB
+        for c in cuotas_pendientes:
+            if getattr(c, "name", None):
+                frappe.db.set_value("Cuota de financiamiento", c.name, {
+                    "saldo_anterior": c.saldo_anterior,
+                    "capital": c.capital,
+                    "intereses": c.intereses,
+                    "total_cuota": c.total_cuota,
+                    "saldo": c.saldo,
+                    "status": c.status
+                }, update_modified=False)
+
+        # Actualizar saldo_actual del financiamiento
+        ultimas_activas = [c for c in self.cuotas if c.status == "Pendiente"]
+        if ultimas_activas:
+            total_futuro = sum(flt(c.total_cuota) for c in ultimas_activas)
+            self.saldo_actual = flt(total_futuro, 2)
+        else:
+            self.saldo_actual = 0.0
+
+        if not self.is_new():
+            frappe.db.set_value("Financiamientos", self.name, "saldo_actual", self.saldo_actual, update_modified=False)
+            if self.docstatus == 0:
+                self.save(ignore_permissions=True)
+
+    def reamortizar_por_abono_interes(self, monto_abono, politica=None):
+        """
+        Aplica un abono extraordinario destinado exclusivamente a reducir intereses futuros.
+        - Las cuotas 'Pagado' no se alteran.
+        - Mantiene el número de cuotas restantes (mismo plazo).
+        - Disminuye el valor total a pagar de cuotas futuras.
+        """
+        from decimal import Decimal, getcontext, ROUND_HALF_UP
+
+        getcontext().prec = 28
+        CENT = Decimal('0.01')
+
+        abono = Decimal(str(monto_abono or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+        if abono <= 0:
+            return
+
+        politicas = self.get_politicas_snapshot()
+        politica = politica or politicas.get("politica_recalculo_interes", "Crédito Directo Cuota Posterior")
+
+        cuotas_pendientes = [c for c in self.cuotas if c.status == "Pendiente"]
+        if not cuotas_pendientes:
+            return
+
+        if politica == "Descuento Prorrateado Futuro":
+            n_rem = len(cuotas_pendientes)
+            descuento_por_cuota = (abono / Decimal(str(n_rem))).quantize(CENT, rounding=ROUND_HALF_UP)
+
+            rem_abono = abono
+            for idx, c in enumerate(cuotas_pendientes):
+                cur_int = Decimal(str(c.intereses))
+                if idx == n_rem - 1:
+                    disc = rem_abono
+                else:
+                    disc = min(descuento_por_cuota, cur_int)
+
+                rem_abono -= disc
+                nuevo_int = (cur_int - disc).quantize(CENT, rounding=ROUND_HALF_UP)
+                if nuevo_int < 0:
+                    nuevo_int = Decimal('0.00')
+
+                c.intereses = float(nuevo_int)
+                c.total_cuota = float(Decimal(str(c.capital)) + nuevo_int)
+
+        else: # "Crédito Directo Cuota Posterior"
+            rem_abono = abono
+            for c in cuotas_pendientes:
+                if rem_abono <= 0:
+                    break
+                cur_int = Decimal(str(c.intereses))
+                disc = min(rem_abono, cur_int)
+                rem_abono -= disc
+                nuevo_int = (cur_int - disc).quantize(CENT, rounding=ROUND_HALF_UP)
+
+                c.intereses = float(nuevo_int)
+                c.total_cuota = float(Decimal(str(c.capital)) + nuevo_int)
+
+        # Persistir cambios en cada fila de cuota en DB
+        for c in cuotas_pendientes:
+            if getattr(c, "name", None):
+                frappe.db.set_value("Cuota de financiamiento", c.name, {
+                    "intereses": c.intereses,
+                    "total_cuota": c.total_cuota
+                }, update_modified=False)
+
+        # Actualizar saldo_actual del financiamiento
+        total_futuro = sum(flt(c.total_cuota) for c in cuotas_pendientes)
+        self.saldo_actual = flt(total_futuro, 2)
+        if not self.is_new():
+            frappe.db.set_value("Financiamientos", self.name, "saldo_actual", self.saldo_actual, update_modified=False)
+            if self.docstatus == 0:
+                self.save(ignore_permissions=True)
+
 
     def calculate_financial_totals(self):
         if self.is_new() or not self.get("cuotas"):
@@ -264,6 +501,25 @@ def update_overdue_mora():
         frappe.db.commit()
     except Exception:
         frappe.log_error(frappe.get_traceback(), 'update_overdue_mora')
+
+
+@frappe.whitelist()
+def adoptar_nuevas_politicas(financiamiento_name):
+    """
+    Actualiza el snapshot de políticas del financiamiento con las políticas
+    vigentes en su Configuración de Urbanización.
+    """
+    doc = frappe.get_doc("Financiamientos", financiamiento_name)
+    if not doc.configuracion_financiamiento:
+        frappe.throw(_("El financiamiento no tiene una configuración asignada."))
+
+    config_doc = frappe.get_doc("Configuracion de Urbanizacion", doc.configuracion_financiamiento)
+    snap_json = json.dumps(config_doc.get_politicas_dict(), indent=2, ensure_ascii=False)
+    frappe.db.set_value("Financiamientos", doc.name, "politicas_financieras_snapshot", snap_json, update_modified=False)
+    if doc.docstatus == 0:
+        doc.save(ignore_permissions=True)
+    frappe.msgprint(_("Políticas de cobro actualizadas a la versión vigente de {0}.").format(doc.configuracion_financiamiento))
+    return {"success": True}
 
 
 @frappe.whitelist()
