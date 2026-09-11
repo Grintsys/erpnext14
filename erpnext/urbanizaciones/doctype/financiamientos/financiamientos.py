@@ -96,7 +96,7 @@ class Financiamientos(Document):
             "version_politica": "Fallback",
         }
 
-    def reamortizar_por_abono_capital(self, monto_abono, politica=None):
+    def reamortizar_por_abono_capital(self, monto_abono, politica=None, invoice_name=None):
         """
         Recalcula la tabla de amortización tras un abono extraordinario a capital.
         - Las cuotas 'Pagado' se mantienen intactas.
@@ -175,7 +175,11 @@ class Financiamientos(Document):
                     c.total_cuota = 0.0
                     c.saldo = 0.0
                     c.saldo_anterior = 0.0
-                    c.status = "Cancelado"
+                    c.status = "Anticipada"
+
+                    nota_txt = f"Pago Anticipada con factura {invoice_name} (Abono extraordinario a capital)." if invoice_name else "Pago Anticipada (Abono extraordinario a capital)."
+                    nota_existente = frappe.utils.cstr(getattr(c, "notas", "")).strip()
+                    c.notas = f"{nota_existente}\n{nota_txt}".strip() if nota_existente else nota_txt
                     continue
 
                 interest = (curr_balance * r).quantize(CENT, rounding=ROUND_HALF_UP)
@@ -204,14 +208,18 @@ class Financiamientos(Document):
         # Persistir cambios en cada fila de cuota en DB
         for c in cuotas_pendientes:
             if getattr(c, "name", None):
-                frappe.db.set_value("Cuota de financiamiento", c.name, {
+                update_vals = {
                     "saldo_anterior": c.saldo_anterior,
                     "capital": c.capital,
                     "intereses": c.intereses,
                     "total_cuota": c.total_cuota,
                     "saldo": c.saldo,
-                    "status": c.status
-                }, update_modified=False)
+                    "status": c.status,
+                    "notas": getattr(c, "notas", "")
+                }
+                if invoice_name and c.status == "Anticipada":
+                    update_vals["sales_invoice"] = invoice_name
+                frappe.db.set_value("Cuota de financiamiento", c.name, update_vals, update_modified=False)
 
         # Actualizar saldo_actual del financiamiento
         ultimas_activas = [c for c in self.cuotas if c.status == "Pendiente"]
@@ -226,7 +234,7 @@ class Financiamientos(Document):
             if self.docstatus == 0:
                 self.save(ignore_permissions=True)
 
-    def reamortizar_por_abono_interes(self, monto_abono, politica=None):
+    def reamortizar_por_abono_interes(self, monto_abono, politica=None, invoice_name=None):
         """
         Aplica un abono extraordinario destinado exclusivamente a reducir intereses futuros.
         - Las cuotas 'Pagado' no se alteran.
@@ -268,6 +276,10 @@ class Financiamientos(Document):
 
                 c.intereses = float(nuevo_int)
                 c.total_cuota = float(Decimal(str(c.capital)) + nuevo_int)
+                if disc > 0:
+                    nota_txt = f"Descuento de L {disc} a intereses por abono desde factura {invoice_name}." if invoice_name else f"Descuento de L {disc} a intereses por abono extraordinario."
+                    nota_existente = frappe.utils.cstr(getattr(c, "notas", "")).strip()
+                    c.notas = f"{nota_existente}\n{nota_txt}".strip() if nota_existente else nota_txt
 
         else: # "Crédito Directo Cuota Posterior"
             rem_abono = abono
@@ -281,13 +293,18 @@ class Financiamientos(Document):
 
                 c.intereses = float(nuevo_int)
                 c.total_cuota = float(Decimal(str(c.capital)) + nuevo_int)
+                if disc > 0:
+                    nota_txt = f"Descuento de L {disc} a intereses por abono desde factura {invoice_name}." if invoice_name else f"Descuento de L {disc} a intereses por abono extraordinario."
+                    nota_existente = frappe.utils.cstr(getattr(c, "notas", "")).strip()
+                    c.notas = f"{nota_existente}\n{nota_txt}".strip() if nota_existente else nota_txt
 
         # Persistir cambios en cada fila de cuota en DB
         for c in cuotas_pendientes:
             if getattr(c, "name", None):
                 frappe.db.set_value("Cuota de financiamiento", c.name, {
                     "intereses": c.intereses,
-                    "total_cuota": c.total_cuota
+                    "total_cuota": c.total_cuota,
+                    "notas": getattr(c, "notas", "")
                 }, update_modified=False)
 
         # Actualizar saldo_actual del financiamiento

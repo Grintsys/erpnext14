@@ -487,7 +487,10 @@ class SalesInvoice(SellingController):
 				if es_pago_parcial:
 					total_esperado = round(monto_recibido_gf, 2)
 				else:
-					if modo_aplicar in ("Abona a siguiente cuota", "Abono a Capital", "Abono a Intereses") and monto_recibido_gf > total_a_pagar_esperado:
+					if modo_aplicar == "Abona a siguiente cuota" and monto_recibido_gf > total_a_pagar_esperado:
+						monto_adelanto_sig = flt(getattr(generar_factura, "monto_adelanto", 0.0)) or (monto_recibido_gf - total_a_pagar_esperado)
+						total_esperado = round(monto_recibido_gf, 2)
+					elif modo_aplicar in ("Abono a Capital", "Abono a Intereses") and monto_recibido_gf > total_a_pagar_esperado:
 						total_esperado = round(monto_recibido_gf, 2)
 					elif getattr(generar_factura, "abonar_siguiente_cuota", 0) and flt(getattr(generar_factura, "monto_adelanto", 0.0)) > 0:
 						monto_adelanto_sig = flt(generar_factura.monto_adelanto)
@@ -568,8 +571,26 @@ class SalesInvoice(SellingController):
 						"Pagado",
 						update_modified=False
 					)
+					frappe.db.set_value(
+						"Cuota de financiamiento",
+						cuota.name,
+						"sales_invoice",
+						self.name,
+						update_modified=False
+					)
 
-					nuevo_saldo = flt(financiamiento.saldo_actual) - (net_cuota_pendiente + flt(cuota.mora))
+					nota_pago = f"Pagado completamente en factura {self.name}."
+					nota_existente = cstr(cuota.notas).strip()
+					nueva_nota = f"{nota_existente}\n{nota_pago}".strip() if nota_existente else nota_pago
+					frappe.db.set_value(
+						"Cuota de financiamiento",
+						cuota.name,
+						"notas",
+						nueva_nota,
+						update_modified=False
+					)
+
+					nuevo_saldo = flt(financiamiento.saldo_actual) - (net_cuota_pendiente + flt(cuota.mora) + monto_adelanto_sig)
 					if nuevo_saldo < 0:
 						nuevo_saldo = 0
 
@@ -581,44 +602,54 @@ class SalesInvoice(SellingController):
 						update_modified=False
 					)
 
-					# Aplicar adelanto a la siguiente cuota si corresponde
+					# Aplicar adelanto a las cuotas futuras si corresponde (soporta multi-cuota)
 					if monto_adelanto_sig > 0:
-						siguiente_cuota_target = None
-						for sig in financiamiento.cuotas[index + 1:]:
-							if sig.status == "Pendiente":
-								siguiente_cuota_target = sig
-								break
+						monto_adelanto_restante = flt(monto_adelanto_sig)
 
-						if siguiente_cuota_target:
-							prev_adelantado = flt(getattr(siguiente_cuota_target, "monto_adelantado", 0.0))
-							nuevo_adelantado = prev_adelantado + monto_adelanto_sig
+						for sig in financiamiento.cuotas[index + 1:]:
+							if monto_adelanto_restante <= 0:
+								break
+							if sig.status != "Pendiente":
+								continue
+
+							total_cuota_sig = flt(sig.total_cuota)
+							prev_adelantado = flt(getattr(sig, "monto_adelantado", 0.0))
+							saldo_neto_sig = total_cuota_sig - prev_adelantado
+							if saldo_neto_sig <= 0:
+								continue
+
+							monto_a_aplicar_cuota = min(monto_adelanto_restante, saldo_neto_sig)
+							nuevo_adelantado = prev_adelantado + monto_a_aplicar_cuota
+
 							frappe.db.set_value(
 								"Cuota de financiamiento",
-								siguiente_cuota_target.name,
+								sig.name,
 								"monto_adelantado",
 								nuevo_adelantado,
 								update_modified=False
 							)
 
-							nota_adelanto = f"Se aplicó abono adelantado de L {monto_adelanto_sig} desde factura {self.name}."
-							nota_existente = cstr(siguiente_cuota_target.notas).strip()
+							nota_adelanto = f"Se aplicó abono adelantado de L {monto_a_aplicar_cuota} desde factura {self.name}."
+							nota_existente = cstr(sig.notas).strip()
 							nueva_nota = f"{nota_existente}\n{nota_adelanto}".strip() if nota_existente else nota_adelanto
 							frappe.db.set_value(
 								"Cuota de financiamiento",
-								siguiente_cuota_target.name,
+								sig.name,
 								"notas",
 								nueva_nota,
 								update_modified=False
 							)
 
-							if nuevo_adelantado >= flt(siguiente_cuota_target.total_cuota):
+							if nuevo_adelantado >= total_cuota_sig - 0.001:
 								frappe.db.set_value(
 									"Cuota de financiamiento",
-									siguiente_cuota_target.name,
+									sig.name,
 									"status",
 									"Pagado",
 									update_modified=False
 								)
+
+							monto_adelanto_restante -= monto_a_aplicar_cuota
 
 
 				siguiente_fecha = None

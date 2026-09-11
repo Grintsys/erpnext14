@@ -158,11 +158,6 @@ class GenerarFactura(Document):
                 _("La política del financiamiento no permite realizar pagos parciales.")
             )
 
-        if monto_recibido_val > total_a_pagar_esperado and politicas.get("permitir_monto_mayor", 1) == 0:
-            frappe.throw(
-                _("La política del financiamiento no permite recibir montos superiores al total a pagar.")
-            )
-
         target_cuota_adelanto = None
         monto_adelanto_aplicar = 0.0
         net_cuota_a_facturar = net_cuota_pendiente
@@ -185,7 +180,9 @@ class GenerarFactura(Document):
             modo_aplicar = self.get("aplicar") or politicas.get("politica_excedentes")
 
             if excedente > 0:
-                if modo_aplicar == "Vuelto en caja":
+                if modo_aplicar == "Vuelto en caja" or not modo_aplicar:
+                    if politicas.get("permitir_monto_mayor", 1) == 0:
+                        frappe.throw(_("La política del financiamiento no permite recibir montos superiores al total a pagar."))
                     if politicas.get("permitir_vuelto_efectivo", 1) == 0:
                         frappe.throw(_("La política del financiamiento no permite la devolución de vuelto en efectivo."))
                 elif modo_aplicar == "Abona a siguiente cuota":
@@ -225,21 +222,43 @@ class GenerarFactura(Document):
                         _("No existen cuotas posteriores pendientes para aplicar el pago adelantado.")
                     )
 
-                target_cuota_adelanto = cuotas_futuras[0]
-                saldo_pendiente_siguiente = flt(target_cuota_adelanto.total_cuota) - flt(getattr(target_cuota_adelanto, "monto_adelantado", 0.0))
+                saldos_futuros = [
+                    flt(c.total_cuota) - flt(getattr(c, "monto_adelantado", 0.0))
+                    for c in cuotas_futuras
+                ]
+                saldo_total_futuro = sum(saldos_futuros)
+
+                if saldo_total_futuro <= 0:
+                    frappe.throw(
+                        _("No existen cuotas posteriores pendientes con saldo para aplicar el pago adelantado.")
+                    )
 
                 regla_monto = politicas.get("regla_monto_siguiente_cuota", "Coincidencia Exacta")
+
                 if regla_monto == "Coincidencia Exacta":
-                    if abs(monto_adelanto_aplicar - saldo_pendiente_siguiente) > 0.01:
+                    cum_sums = []
+                    current_sum = 0.0
+                    for s in saldos_futuros:
+                        current_sum += s
+                        cum_sums.append(current_sum)
+
+                    match_found = any(abs(monto_adelanto_aplicar - cum_s) <= 0.01 for cum_s in cum_sums)
+
+                    if not match_found:
                         frappe.throw(
-                            _("La política requiere coincidencia exacta con el monto de la siguiente cuota (L {0}). Para montos diferentes debe utilizar Abono a Capital.")
-                            .format(saldo_pendiente_siguiente)
+                            _(
+                                "La política de 'Coincidencia Exacta' requiere que el anticipo cubra exactamente el total de 1 o más cuotas completas posteriores. El monto entregado (L {0}) no coincide con ninguna combinación exacta de cuotas futuras."
+                            ).format(monto_adelanto_aplicar)
                         )
-                elif monto_adelanto_aplicar > saldo_pendiente_siguiente:
+
+                elif monto_adelanto_aplicar > saldo_total_futuro + 0.01:
                     frappe.throw(
-                        _("El monto del adelanto (L {0}) supera el saldo pendiente de la siguiente cuota (L {1}). Para montos superiores debe utilizarse Abono a Capital.")
-                        .format(monto_adelanto_aplicar, saldo_pendiente_siguiente)
+                        _(
+                            "El monto del adelanto (L {0}) supera el saldo total pendiente de todas las cuotas futuras (L {1}). Para montos superiores debe utilizar Abono Extraordinario a Capital."
+                        ).format(monto_adelanto_aplicar, saldo_total_futuro)
                     )
+
+                target_cuota_adelanto = cuotas_futuras[0]
 
                 if not getattr(configuracion, "item_adelantos", None):
                     frappe.throw(
@@ -390,9 +409,9 @@ class GenerarFactura(Document):
         if monto_abono_extraordinario > 0 and tipo_abono_extraordinario:
             financiamiento_reload = frappe.get_doc("Financiamientos", financiamiento.name)
             if tipo_abono_extraordinario == "Capital":
-                financiamiento_reload.reamortizar_por_abono_capital(monto_abono_extraordinario)
+                financiamiento_reload.reamortizar_por_abono_capital(monto_abono_extraordinario, invoice_name=invoice.name)
             elif tipo_abono_extraordinario == "Intereses":
-                financiamiento_reload.reamortizar_por_abono_interes(monto_abono_extraordinario)
+                financiamiento_reload.reamortizar_por_abono_interes(monto_abono_extraordinario, invoice_name=invoice.name)
 
 
 

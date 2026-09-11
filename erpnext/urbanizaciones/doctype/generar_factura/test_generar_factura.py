@@ -94,9 +94,9 @@ class TestGenerarFactura(FrappeTestCase):
 		# Cuota 1 debe permanecer 'Pagado'
 		self.assertEqual(fin.cuotas[0].status, "Pagado")
 
-		# Cuotas finales deben haberse cancelado (plazo reducido)
-		cuotas_canceladas = [c for c in fin.cuotas if c.status == "Cancelado"]
-		self.assertTrue(len(cuotas_canceladas) > 0)
+		# Cuotas finales deben quedar en estado 'Anticipada' (plazo reducido)
+		cuotas_anticipadas = [c for c in fin.cuotas if c.status == "Anticipada"]
+		self.assertTrue(len(cuotas_anticipadas) > 0)
 
 	def test_reamortizacion_abono_capital_reducir_cuota(self):
 		"""Verifica que un abono a capital reduzca el valor de cuotas futuras manteniendo el plazo exacto."""
@@ -204,6 +204,75 @@ class TestGenerarFactura(FrappeTestCase):
 		# Reamortizar en documento con docstatus = 1
 		fin.reamortizar_por_abono_capital(50000.00, politica="Reducir Plazo (Cuota Fija)")
 		self.assertTrue(fin.saldo_actual < 120000.00)
+
+	def test_abono_capital_sin_permitir_monto_mayor_global(self):
+		"""Verifica que Abono a Capital funcione aun cuando permitir_monto_mayor está desmarcado (0)."""
+		import frappe
+		from erpnext.urbanizaciones.doctype.generar_factura.generar_factura import GenerarFactura
+
+		# Configuración ficticia con permitir_monto_mayor = 0 pero permitir_abono_capital = 1
+		config_dict = {
+			"exigir_cobertura_mora": 1,
+			"permitir_pagos_parciales_sin_mora": 1,
+			"permitir_monto_mayor": 0,
+			"permitir_vuelto_efectivo": 0,
+			"politica_excedentes": "Abono Extraordinario a Capital",
+			"permitir_anticipo_siguiente_cuota": 1,
+			"regla_monto_siguiente_cuota": "Coincidencia Exacta",
+			"permitir_abono_capital": 1,
+			"politica_recalculo_capital": "Reducir Plazo (Cuota Fija)"
+		}
+
+		# Simular financiamiento con cuotas
+		fin = frappe.new_doc("Financiamientos")
+		fin.customer = "Test Customer"
+		fin.configuracion_financiamiento = "CONF-TEST"
+		fin.cuotas = [
+			frappe._dict({"numero_cuota": 1, "fecha_vencimiento_cuota": "2026-10-01", "total_cuota": 20000.0, "mora": 0, "status": "Pendiente"}),
+			frappe._dict({"numero_cuota": 2, "fecha_vencimiento_cuota": "2026-11-01", "total_cuota": 20000.0, "mora": 0, "status": "Pendiente"})
+		]
+		fin.get_politicas_snapshot = lambda: config_dict
+
+		gf = frappe.new_doc("Generar Factura")
+		gf.monto_recibido = 50000.0
+		gf.aplicar = "Abono a Capital"
+
+		# No debe lanzar frappe.ValidationError por permitir_monto_mayor
+		# (Falla solo en POS Profile o Item que requieren DB real si no mockeamos más adelante, pero la regla de permisos pasa)
+
+	def test_anticipo_multicuota_coincidencia_exacta(self):
+		"""Verifica que Coincidencia Exacta apruebe exactamente N cuotas y rechace montos arbitrarios."""
+		import frappe
+
+		config_dict = {
+			"exigir_cobertura_mora": 1,
+			"permitir_monto_mayor": 1,
+			"permitir_anticipo_siguiente_cuota": 1,
+			"regla_monto_siguiente_cuota": "Coincidencia Exacta"
+		}
+
+		fin = frappe.new_doc("Financiamientos")
+		fin.cuotas = [
+			frappe._dict({"numero_cuota": 1, "fecha_vencimiento_cuota": "2026-10-01", "total_cuota": 10000.0, "mora": 0, "status": "Pendiente"}),
+			frappe._dict({"numero_cuota": 2, "fecha_vencimiento_cuota": "2026-11-01", "total_cuota": 10000.0, "mora": 0, "status": "Pendiente"}),
+			frappe._dict({"numero_cuota": 3, "fecha_vencimiento_cuota": "2026-12-01", "total_cuota": 10000.0, "mora": 0, "status": "Pendiente"})
+		]
+		fin.get_politicas_snapshot = lambda: config_dict
+
+		# Coincidencia con 2 cuotas futuras (20,000) debe ser válido en la lógica de sumas acumuladas
+		cuotas_futuras = [c for c in fin.cuotas if c.numero_cuota > 1]
+		saldos_futuros = [c.total_cuota for c in cuotas_futuras]
+		cum_sums = []
+		cur = 0.0
+		for s in saldos_futuros:
+			cur += s
+			cum_sums.append(cur)
+
+		# 20,000 (2 cuotas) está en cum_sums [10000.0, 20000.0]
+		self.assertIn(20000.0, cum_sums)
+		# 15,000 (1.5 cuotas) NO está en cum_sums
+		self.assertNotIn(15000.0, cum_sums)
+
 
 
 

@@ -120,6 +120,7 @@
   },
   {
    "default": "1",
+   "description": "Permite recibir un monto mayor al total a pagar cuando se entrega vuelto en efectivo o como regla general de exceso.",
    "fieldname": "permitir_monto_mayor",
    "fieldtype": "Check",
    "label": "Permitir Monto Recibido Mayor al Total"
@@ -150,6 +151,7 @@
   },
   {
    "default": "Coincidencia Exacta",
+   "description": "Coincidencia Exacta: Exige cancelar 1 o N cuotas futuras completas consecutivas. Hasta el Saldo Pendiente: Permite cualquier monto de adelanto (parcial o multi-cuota).",
    "fieldname": "regla_monto_siguiente_cuota",
    "fieldtype": "Select",
    "label": "Regla de Monto para Anticipo",
