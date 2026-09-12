@@ -1,0 +1,32 @@
+{
+ "content": null,
+ "creation": "2026-09-11 21:30:00.000000",
+ "docstatus": 0,
+ "doctype": "Page",
+ "idx": 0,
+ "modified": "2026-09-11 21:30:00.000000",
+ "modified_by": "Administrator",
+ "module": "Selling",
+ "name": "tablero-facturas-venta",
+ "owner": "Administrator",
+ "page_name": "tablero-facturas-venta",
+ "roles": [
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Sales User"
+  },
+  {
+   "role": "Accounts Manager"
+  },
+  {
+   "role": "Accounts User"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "standard": "Yes",
+ "title": "Tablero de Facturas de Venta"
+}

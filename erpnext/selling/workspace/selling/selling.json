@@ -1,12 +1,12 @@
 {
  "charts": [
   {
-   "chart_name": "Sales Order Trends",
-   "label": "Sales Order Trends"
+   "chart_name": "Tendencias de ventas",
+   "label": "Tendencias de ventas"
   }
  ],
- "content": "[{\"id\":\"ow595dYDrI\",\"type\":\"onboarding\",\"data\":{\"onboarding_name\":\"Selling\",\"col\":12}},{\"id\":\"vBSf8Vi9U8\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Sales Order Trends\",\"col\":12}},{\"id\":\"aW2i5R5GRP\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"1it3dCOnm6\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Quick Access</b></span>\",\"col\":12}},{\"id\":\"x7pLl-spS4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Item\",\"col\":3}},{\"id\":\"SSGrXWmY-H\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Order\",\"col\":3}},{\"id\":\"-5J_yLxDaS\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Analytics\",\"col\":3}},{\"id\":\"6YEYpnIBKV\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Point of Sale\",\"col\":3}},{\"id\":\"c_GjZuZ2oN\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Dashboard\",\"col\":3}},{\"id\":\"oNjjNbnUHp\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"0BcePLg0g1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports &amp; Masters</b></span>\",\"col\":12}},{\"id\":\"uze5dJ1ipL\",\"type\":\"card\",\"data\":{\"card_name\":\"Selling\",\"col\":4}},{\"id\":\"3j2fYwMAkq\",\"type\":\"card\",\"data\":{\"card_name\":\"Point of Sale\",\"col\":4}},{\"id\":\"xImm8NepFt\",\"type\":\"card\",\"data\":{\"card_name\":\"Items and Pricing\",\"col\":4}},{\"id\":\"6MjIe7KCQo\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}},{\"id\":\"lBu2EKgmJF\",\"type\":\"card\",\"data\":{\"card_name\":\"Key Reports\",\"col\":4}},{\"id\":\"1ARHrjg4kI\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}}]",
- "creation": "2020-01-28 11:49:12.092882",
+ "content": "[{\"id\":\"ow595dYDrI\",\"type\":\"onboarding\",\"data\":{\"onboarding_name\":\"Selling\",\"col\":12}},{\"id\":\"vBSf8Vi9U8\",\"type\":\"chart\",\"data\":{\"chart_name\":\"Tendencias de ventas\",\"col\":12}},{\"id\":\"aW2i5R5GRP\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"1it3dCOnm6\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Quick Access</b></span>\",\"col\":12}},{\"id\":\"x7pLl-spS4\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Item\",\"col\":3}},{\"id\":\"SSGrXWmY-H\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Order\",\"col\":3}},{\"id\":\"-5J_yLxDaS\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Sales Analytics\",\"col\":3}},{\"id\":\"6YEYpnIBKV\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Point of Sale\",\"col\":3}},{\"id\":\"c_GjZuZ2oN\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Dashboard\",\"col\":3}},{\"id\":\"oNjjNbnUHp\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"0BcePLg0g1\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Reports &amp; Masters</b></span>\",\"col\":12}},{\"id\":\"uze5dJ1ipL\",\"type\":\"card\",\"data\":{\"card_name\":\"Selling\",\"col\":4}},{\"id\":\"3j2fYwMAkq\",\"type\":\"card\",\"data\":{\"card_name\":\"Point of Sale\",\"col\":4}},{\"id\":\"xImm8NepFt\",\"type\":\"card\",\"data\":{\"card_name\":\"Items and Pricing\",\"col\":4}},{\"id\":\"6MjIe7KCQo\",\"type\":\"card\",\"data\":{\"card_name\":\"Settings\",\"col\":4}},{\"id\":\"lBu2EKgmJF\",\"type\":\"card\",\"data\":{\"card_name\":\"Key Reports\",\"col\":4}},{\"id\":\"1ARHrjg4kI\",\"type\":\"card\",\"data\":{\"card_name\":\"Other Reports\",\"col\":4}}]",
+ "creation": "2026-09-11 19:55:05.957123",
  "custom_blocks": [],
  "docstatus": 0,
  "doctype": "Workspace",
@@ -140,6 +140,17 @@
    "link_count": 0,
    "link_to": "Price List",
    "link_type": "DocType",
+   "onboard": 1,
+   "type": "Link"
+  },
+  {
+   "dependencies": "",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Precio y Utilidades",
+   "link_count": 0,
+   "link_to": "precio-y-utilidades",
+   "link_type": "Page",
    "onboard": 1,
    "type": "Link"
   },
@@ -621,7 +632,7 @@
    "type": "Link"
   }
  ],
- "modified": "2025-09-10 22:28:27.489178",
+ "modified": "2026-09-11 22:34:08.453195",
  "modified_by": "Administrator",
  "module": "Selling",
  "name": "Selling",
