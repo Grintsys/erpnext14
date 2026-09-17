@@ -1,61 +1,130 @@
-# Copyright (c) 2025, Frappe Technologies Pvt. Ltd. and contributors
+# Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
 import frappe
+from frappe import _
 from frappe.model.document import Document
+from frappe.utils import getdate, nowdate, flt
+
 
 class ModificarMora(Document):
-    def on_submit(self):
-        """
-        Al enviar el documento, actualizar la mora de la cuota más antigua pendiente
-        usando la API de base de datos en vez del API de documentos (document API).
-        """
-        if not self.financiamiento or self.mora_negociada is None:
-            return
+	def validate(self):
+		self.validate_fecha_limite()
+		self.validate_and_calculate_totals()
 
-        # Buscar la cuota más antigua pendiente para este financiamiento
-        try:
-            filas = frappe.db.sql(
-                """
-                SELECT name, numero_cuota, fecha_vencimiento_cuota
-                FROM `tabCuota de financiamiento`
-                WHERE parent = %s
-                  AND LOWER(COALESCE(status, '')) = %s
-                ORDER BY (fecha_vencimiento_cuota IS NULL), fecha_vencimiento_cuota ASC, name ASC
-                LIMIT 1
-                """,
-                (self.financiamiento, 'pendiente'),
-                as_dict=True,
-            )
-        except Exception:
-            frappe.log_error(frappe.get_traceback(), 'ModificarMora.on_submit - sql')
-            frappe.throw('Error buscando cuotas en la base de datos.')
+	def validate_fecha_limite(self):
+		if not self.fecha_limite_acuerdo:
+			frappe.throw(_("Debe especificar una Fecha Límite para el Acuerdo."))
+		
+		if getdate(self.fecha_limite_acuerdo) < getdate(nowdate()):
+			frappe.throw(_("La Fecha Límite del Acuerdo no puede ser anterior a la fecha actual ({0}).").format(nowdate()))
 
-        if not filas:
-            frappe.throw('No se encontraron cuotas pendientes para actualizar.')
+	def validate_and_calculate_totals(self):
+		if not self.get("cuotas_detalle"):
+			frappe.throw(_("Debe incluir al menos una cuota en la tabla de detalle para negociar."))
 
-        cuota = filas[0]
+		tot_actual = 0.0
+		tot_negociada = 0.0
 
-        # Verificar que la cuota encontrada coincida con la registrada en este documento
-        if getattr(self, 'numero_cuota', None) is not None:
-            try:
-                numero = int(cuota.get('numero_cuota')) if cuota.get('numero_cuota') is not None else None
-            except Exception:
-                numero = cuota.get('numero_cuota')
+		for row in self.cuotas_detalle:
+			if row.mora_negociada is None or flt(row.mora_negociada) < 0:
+				frappe.throw(
+					_("La mora negociada para la cuota #{0} no puede ser negativa.").format(row.numero_cuota)
+				)
 
-            if numero is not None and str(numero) != str(self.numero_cuota):
-                frappe.throw(f'La cuota más antigua no coincide. Esperada: {self.numero_cuota}, Encontrada: {cuota.get("numero_cuota")}')
+			row.descuento = flt(flt(row.mora_actual) - flt(row.mora_negociada), 2)
+			tot_actual += flt(row.mora_actual)
+			tot_negociada += flt(row.mora_negociada)
 
-        # Actualizar la columna `mora` directamente en la tabla de la child table
-        try:
-            frappe.db.set_value('Cuota de financiamiento', cuota.name, 'mora', float(self.mora_negociada), update_modified=False)
-            frappe.db.commit()
-        except Exception:
-            frappe.log_error(frappe.get_traceback(), 'ModificarMora.on_submit - set_value')
-            frappe.throw('Error actualizando la mora en la base de datos.')
+		self.total_mora_actual = flt(tot_actual, 2)
+		self.total_mora_negociada = flt(tot_negociada, 2)
+		self.total_descuento = flt(tot_actual - tot_negociada, 2)
 
-        # Mensaje de confirmación
-        frappe.msgprint(
-            f'Mora actualizada exitosamente. Cuota {cuota.get("numero_cuota")}: {self.mora_negociada}',
-            title='Éxito'
-        )
+	def on_submit(self):
+		"""
+		Aplica las moras negociadas a las cuotas seleccionadas y fija la fecha de congelamiento.
+		"""
+		for row in self.cuotas_detalle:
+			if not row.cuota_name:
+				continue
+
+			frappe.db.set_value(
+				"Cuota de financiamiento",
+				row.cuota_name,
+				{
+					"mora": flt(row.mora_negociada),
+					"mora_congelada_hasta": self.fecha_limite_acuerdo
+				},
+				update_modified=False
+			)
+
+		frappe.db.commit()
+		frappe.msgprint(
+			_("Se aplicaron las moras negociadas para {0} cuotas con fecha límite de congelamiento hasta el {1}.").format(
+				len(self.cuotas_detalle), self.fecha_limite_acuerdo
+			),
+			title=_("Acuerdo de Mora Aplicado")
+		)
+
+	def on_cancel(self):
+		"""
+		Al cancelar el acuerdo, remueve el congelamiento y recalcula la mora estándar.
+		"""
+		from erpnext.urbanizaciones.doctype.financiamientos.financiamientos import update_overdue_mora
+
+		for row in self.cuotas_detalle:
+			if not row.cuota_name:
+				continue
+
+			frappe.db.set_value(
+				"Cuota de financiamiento",
+				row.cuota_name,
+				{
+					"mora_congelada_hasta": None
+				},
+				update_modified=False
+			)
+
+		update_overdue_mora()
+		frappe.db.commit()
+		frappe.msgprint(
+			_("Se ha cancelado el acuerdo de mora y restablecido el cálculo estándar de mora."),
+			title=_("Acuerdo Cancelado")
+		)
+
+
+@frappe.whitelist()
+def get_vencidas_cuotas(financiamiento):
+	"""
+	Obtiene todas las cuotas pendientes vencidas para un financiamiento,
+	calculando los días de atraso y la mora actual acumulada.
+	"""
+	if not financiamiento:
+		return []
+
+	today = nowdate()
+	fin = frappe.get_doc("Financiamientos", financiamiento)
+	mora_diaria = flt(fin.mora_diaria or 0)
+
+	cuotas = []
+	for c in fin.cuotas:
+		if c.status == "Pendiente" and c.fecha_vencimiento_cuota and getdate(c.fecha_vencimiento_cuota) < getdate(today):
+			dias = (getdate(today) - getdate(c.fecha_vencimiento_cuota)).days
+			# Si ya tiene una mora calculada o la calculamos
+			mora_sistema = flt(c.total_cuota * (mora_diaria / 100.0) * dias, 2)
+			mora_actual = flt(c.mora) if flt(c.mora) > 0 else mora_sistema
+
+			cuotas.append({
+				"cuota_name": c.name,
+				"numero_cuota": c.numero_cuota,
+				"fecha_vencimiento_cuota": c.fecha_vencimiento_cuota,
+				"total_cuota": flt(c.total_cuota, 2),
+				"dias_mora": dias,
+				"mora_actual": mora_actual,
+				"mora_negociada": mora_actual,
+				"descuento": 0.0
+			})
+
+	# Ordenar por número de cuota ascendente
+	cuotas.sort(key=lambda x: x["numero_cuota"])
+	return cuotas

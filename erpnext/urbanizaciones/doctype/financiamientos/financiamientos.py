@@ -480,41 +480,26 @@ TWOPLACES = Decimal('0.01')
 
 def update_overdue_mora():
     """
-    Scheduler: actualizar el campo `mora` en Cuota de financiamiento para filas
-    con status 'Pendiente' y fecha_vencimiento_cuota < hoy.
+    Scheduler (daily): Actualiza masivamente el campo `mora` en Cuota de financiamiento
+    para todas las cuotas con status 'Pendiente' y fecha_vencimiento_cuota < hoy.
 
-    Cálculo: mora = saldo * (mora_diaria / 100) * dias_vencidos
-    Redondeo a 2 decimales con ROUND_HALF_UP.
+    Fórmula: mora = ROUND(total_cuota * (mora_diaria / 100) * dias_vencidos, 2)
+    Ejecución vectorizada masiva en base de datos (O(1) memoria RAM, cero N+1 queries).
     """
-    today = nowdate()
     try:
-        rows = frappe.db.sql("""
-            SELECT name, total_cuota, fecha_vencimiento_cuota, parent
-            FROM `tabCuota de financiamiento`
-            WHERE status = %s
-              AND fecha_vencimiento_cuota < %s
-        """, ('Pendiente', today), as_dict=True)
-
-        for r in rows:
-            try:
-                if not r.get('fecha_vencimiento_cuota'):
-                    continue
-                days = (getdate(today) - getdate(r.fecha_vencimiento_cuota)).days
-                if days <= 0:
-                    continue
-
-                mora_pct = frappe.db.get_value('Financiamientos', r.parent, 'mora_diaria') or 0
-                # Use total_cuota for mora calculation per requirements
-                total_cuota = Decimal(str(r.get('total_cuota') or 0))
-
-                # mora = total_cuota * (mora_diaria/100) * days
-                mora_amount = (total_cuota * (Decimal(str(mora_pct)) / Decimal('100')) * Decimal(days))
-                mora_amount = mora_amount.quantize(TWOPLACES, rounding=ROUND_HALF_UP)
-
-                # set_value acepta float/Decimal; guardamos como string/float
-                frappe.db.set_value('Cuota de financiamiento', r.name, 'mora', float(mora_amount))
-            except Exception:
-                frappe.log_error(frappe.get_traceback(), 'update_overdue_mora_row')
+        frappe.db.sql("""
+            UPDATE `tabCuota de financiamiento` c
+            INNER JOIN `tabFinanciamientos` f ON f.name = c.parent
+            SET c.mora = ROUND(
+                c.total_cuota * (COALESCE(f.mora_diaria, 0) / 100.0) * DATEDIFF(CURDATE(), c.fecha_vencimiento_cuota),
+                2
+            )
+            WHERE c.status = 'Pendiente'
+              AND c.fecha_vencimiento_cuota IS NOT NULL
+              AND c.fecha_vencimiento_cuota < CURDATE()
+              AND COALESCE(f.mora_diaria, 0) > 0
+              AND (c.mora_congelada_hasta IS NULL OR c.mora_congelada_hasta < CURDATE())
+        """)
         frappe.db.commit()
     except Exception:
         frappe.log_error(frappe.get_traceback(), 'update_overdue_mora')

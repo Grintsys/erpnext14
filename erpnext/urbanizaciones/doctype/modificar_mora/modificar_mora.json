@@ -12,21 +12,24 @@
   "naming_series",
   "customer",
   "financiamiento",
-  "numero_cuota",
   "column_break_1",
-  "total_cuota",
-  "fecha_vencimiento_cuota",
-  "mora",
-  "section_break_2",
-  "mora_negociada",
+  "fecha_limite_acuerdo",
   "motivo",
+  "section_break_cuotas",
+  "cuotas_detalle",
+  "section_break_totales",
+  "total_mora_actual",
+  "column_break_totales",
+  "total_mora_negociada",
+  "column_break_totales_2",
+  "total_descuento",
   "amended_from"
  ],
  "fields": [
   {
    "fieldname": "section_break_1",
    "fieldtype": "Section Break",
-   "label": "Datos"
+   "label": "Datos Principales"
   },
   {
    "fieldname": "naming_series",
@@ -42,7 +45,8 @@
    "in_list_view": 1,
    "in_standard_filter": 1,
    "label": "Cliente",
-   "options": "Customer"
+   "options": "Customer",
+   "reqd": 1
   },
   {
    "fieldname": "financiamiento",
@@ -54,6 +58,67 @@
    "reqd": 1
   },
   {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "description": "Fecha hasta la cual se mantendr\u00e1n congeladas las moras acordadas",
+   "fieldname": "fecha_limite_acuerdo",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Fecha L\u00edmite del Acuerdo",
+   "reqd": 1
+  },
+  {
+   "fieldname": "motivo",
+   "fieldtype": "Small Text",
+   "label": "Motivo del Acuerdo",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_cuotas",
+   "fieldtype": "Section Break",
+   "label": "Cuotas Vencidas a Negociar"
+  },
+  {
+   "fieldname": "cuotas_detalle",
+   "fieldtype": "Table",
+   "label": "Detalle de Cuotas",
+   "options": "Modificar Mora Cuota",
+   "reqd": 1
+  },
+  {
+   "fieldname": "section_break_totales",
+   "fieldtype": "Section Break",
+   "label": "Resumen de Negociaci\u00f3n"
+  },
+  {
+   "fieldname": "total_mora_actual",
+   "fieldtype": "Currency",
+   "label": "Total Mora Sistema",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totales",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_mora_negociada",
+   "fieldtype": "Currency",
+   "label": "Total Mora Acordada",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_totales_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_descuento",
+   "fieldtype": "Currency",
+   "label": "Total Descuento Otorgado",
+   "read_only": 1
+  },
+  {
    "fieldname": "amended_from",
    "fieldtype": "Link",
    "label": "Amended From",
@@ -62,57 +127,12 @@
    "print_hide": 1,
    "read_only": 1,
    "search_index": 1
-  },
-  {
-   "fieldname": "numero_cuota",
-   "fieldtype": "Int",
-   "label": "Numero de cuota",
-   "read_only": 1
-  },
-  {
-   "fieldname": "fecha_vencimiento_cuota",
-   "fieldtype": "Date",
-   "label": "Fecha de vencimiento",
-   "read_only": 1
-  },
-  {
-   "fieldname": "total_cuota",
-   "fieldtype": "Currency",
-   "label": "Total cuota",
-   "read_only": 1
-  },
-  {
-   "fieldname": "mora",
-   "fieldtype": "Currency",
-   "label": "Mora",
-   "read_only": 1
-  },
-  {
-   "fieldname": "column_break_1",
-   "fieldtype": "Column Break"
-  },
-  {
-   "fieldname": "section_break_2",
-   "fieldtype": "Section Break",
-   "label": "Valor a negociar"
-  },
-  {
-   "fieldname": "mora_negociada",
-   "fieldtype": "Currency",
-   "label": "Mora negociada",
-   "reqd": 1
-  },
-  {
-   "fieldname": "motivo",
-   "fieldtype": "Small Text",
-   "label": "Motivo",
-   "reqd": 1
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-01-07 21:29:20.278102",
+ "modified": "2026-09-16 23:15:00.000000",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Modificar Mora",

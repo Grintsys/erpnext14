@@ -1,0 +1,96 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2026-09-16 23:15:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "cuota_name",
+  "numero_cuota",
+  "fecha_vencimiento_cuota",
+  "total_cuota",
+  "dias_mora",
+  "mora_actual",
+  "mora_negociada",
+  "descuento"
+ ],
+ "fields": [
+  {
+   "fieldname": "cuota_name",
+   "fieldtype": "Data",
+   "hidden": 1,
+   "label": "ID Cuota"
+  },
+  {
+   "columns": 1,
+   "fieldname": "numero_cuota",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "No. Cuota",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "fecha_vencimiento_cuota",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Vencimiento",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "total_cuota",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Total Cuota",
+   "read_only": 1
+  },
+  {
+   "columns": 1,
+   "fieldname": "dias_mora",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "D\u00edas Mora",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "mora_actual",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Mora Actual",
+   "read_only": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "mora_negociada",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Mora Negociada",
+   "reqd": 1
+  },
+  {
+   "columns": 2,
+   "fieldname": "descuento",
+   "fieldtype": "Currency",
+   "in_list_view": 1,
+   "label": "Descuento",
+   "read_only": 1
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2026-09-16 23:15:00.000000",
+ "modified_by": "Administrator",
+ "module": "Urbanizaciones",
+ "name": "Modificar Mora Cuota",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}

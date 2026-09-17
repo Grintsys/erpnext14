@@ -17,6 +17,7 @@
   "numero_cuota",
   "saldo_anterior",
   "mora",
+  "mora_congelada_hasta",
   "monto_adelantado",
   "sales_invoice"
  ],
@@ -96,6 +97,12 @@
    "fieldtype": "Currency",
    "label": "Mora",
    "reqd": 1
+  },
+  {
+   "fieldname": "mora_congelada_hasta",
+   "fieldtype": "Date",
+   "label": "Mora congelada hasta",
+   "read_only": 1
   },
   {
    "fieldname": "sales_invoice",
