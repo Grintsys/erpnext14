@@ -4,6 +4,52 @@ import frappe
 from frappe import _
 
 @frappe.whitelist()
+def get_share_details(doctype, name, format=None):
+	"""
+	Returns customer contact details and pre-composed message for sharing via WhatsApp.
+	"""
+	if not doctype or not name:
+		frappe.throw(_("DocType and Name are required."))
+
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission("read")
+
+	customer_mobile = getattr(doc, "contact_mobile", None) or getattr(doc, "contact_phone", None)
+	customer_name = getattr(doc, "customer_name", None) or getattr(doc, "customer", "")
+
+	if not customer_mobile and doc.get("customer"):
+		customer_doc = frappe.db.get_value("Customer", doc.customer, ["mobile_no"], as_dict=True)
+		if customer_doc:
+			customer_mobile = customer_doc.get("mobile_no")
+
+	if not customer_mobile and doc.get("contact_person"):
+		contact_doc = frappe.db.get_value("Contact", doc.contact_person, ["mobile_no", "phone"], as_dict=True)
+		if contact_doc:
+			customer_mobile = contact_doc.get("mobile_no") or contact_doc.get("phone")
+
+	currency = doc.get("currency") or "L"
+	grand_total = frappe.utils.fmt_money(doc.get("grand_total") or 0, currency=currency)
+
+	host = frappe.utils.get_url()
+	pdf_url = f"{host}/api/method/erpnext.accounts.doctype.sales_invoice.share_invoice.download_pdf?doctype={doctype}&name={name}&format={format or 'Standard'}&no_letterhead=0"
+
+	default_message = (
+		f"Estimado(a) {customer_name or 'Cliente'},\n"
+		f"Le compartimos el comprobante de su Factura {name} por un monto de {grand_total}.\n"
+		f"Puede consultar y descargar su factura en el siguiente enlace:\n{pdf_url}"
+	)
+
+	return {
+		"customer_name": customer_name,
+		"customer_mobile": customer_mobile or "",
+		"grand_total": grand_total,
+		"currency": currency,
+		"pdf_url": pdf_url,
+		"default_message": default_message
+	}
+
+
+@frappe.whitelist()
 def log_share_event(doctype, name, print_format=None, share_method=None):
 	"""
 	Logs adoption metrics when a user triggers the 'Compartir' action on a document.

@@ -152,11 +152,11 @@ erpnext.accounts.SalesInvoiceController = class SalesInvoiceController extends e
 
 	setup_share_invoice_button() {
 		const me = this;
-		this.frm.page.add_inner_button(__('Compartir PDF'), function() {
+		this.frm.page.add_inner_button(__('Compartir Factura'), function() {
 			leaf_share_sales_invoice(me.frm);
 		});
 
-		this.frm.add_custom_button(__('Compartir PDF'), function() {
+		this.frm.add_custom_button(__('Compartir Factura'), function() {
 			leaf_share_sales_invoice(me.frm);
 		}, __('Acciones'));
 	}
@@ -1149,103 +1149,152 @@ function leaf_share_sales_invoice(frm) {
 	let print_formats = frappe.meta.get_print_formats(frm.doctype) || ['Standard'];
 	let default_format = (frm.meta && frm.meta.default_print_format) || print_formats[0] || 'Standard';
 
-	if (print_formats.length > 1) {
-		let d = new frappe.ui.Dialog({
-			title: __('Compartir Factura - Seleccionar Formato'),
-			fields: [
-				{
-					label: __('Formato de Impresión'),
-					fieldname: 'print_format',
-					fieldtype: 'Select',
-					options: print_formats,
-					default: default_format,
-					reqd: 1
-				},
-				{
-					label: __('Incluir Encabezado (Letterhead)'),
-					fieldname: 'no_letterhead',
-					fieldtype: 'Check',
-					default: 0
-				}
-			],
-			primary_action_label: __('Compartir'),
-			primary_action: function(values) {
-				d.hide();
-				execute_pdf_share(frm, values.print_format, values.no_letterhead);
-			}
-		});
-		d.show();
-	} else {
-		execute_pdf_share(frm, default_format, 0);
-	}
-}
-
-async function execute_pdf_share(frm, print_format, no_letterhead) {
-	frappe.show_progress(__('Generando PDF...'), 30, 100);
-
-	try {
-		const params = $.param({
+	frappe.call({
+		method: 'erpnext.accounts.doctype.sales_invoice.share_invoice.get_share_details',
+		args: {
 			doctype: frm.doctype,
 			name: frm.doc.name,
-			format: print_format,
-			no_letterhead: no_letterhead ? 1 : 0
-		});
-		const pdf_url = frappe.urllib.get_full_url('/api/method/erpnext.accounts.doctype.sales_invoice.share_invoice.download_pdf?' + params);
+			format: default_format
+		},
+		freeze: true,
+		freeze_message: __('Preparando datos para compartir...'),
+		callback: function(r) {
+			if (!r.message) return;
+			const data = r.message;
 
-		const response = await fetch(pdf_url);
-		if (!response.ok) {
-			throw new Error(__('No se pudo generar el PDF de la factura.'));
-		}
-
-		frappe.show_progress(__('Generando PDF...'), 80, 100);
-		const blob = await response.blob();
-		frappe.hide_progress();
-
-		const file_name = `${frm.doc.name}.pdf`;
-		const pdf_file = new File([blob], file_name, { type: 'application/pdf' });
-
-		if (navigator.canShare && navigator.canShare({ files: [pdf_file] })) {
-			try {
-				await navigator.share({
-					files: [pdf_file],
-					title: frm.doc.name,
-					text: __('Factura {0}', [frm.doc.name])
-				});
-				log_share_event(frm.doctype, frm.doc.name, print_format, 'native');
-			} catch (shareErr) {
-				if (shareErr.name !== 'AbortError') {
-					console.warn('Share API error, fallback to download:', shareErr);
-					trigger_fallback_download(blob, file_name, frm, print_format);
+			const dialog = new frappe.ui.Dialog({
+				title: __('Compartir Factura: {0}', [frm.doc.name]),
+				fields: [
+					{
+						label: __('Formato de Impresión'),
+						fieldname: 'print_format',
+						fieldtype: 'Select',
+						options: print_formats,
+						default: default_format,
+						onchange: function() {
+							update_leaf_share_dialog_message(dialog, frm, data);
+						}
+					},
+					{
+						label: __('Sin Encabezado (Letterhead)'),
+						fieldname: 'no_letterhead',
+						fieldtype: 'Check',
+						default: 0,
+						onchange: function() {
+							update_leaf_share_dialog_message(dialog, frm, data);
+						}
+					},
+					{
+						fieldtype: 'Section Break',
+						label: __('Enviar por WhatsApp')
+					},
+					{
+						label: __('Teléfono WhatsApp del Cliente'),
+						fieldname: 'customer_phone',
+						fieldtype: 'Data',
+						default: data.customer_mobile || '',
+						description: __('Ingrese el número celular (ej. 9999-8888 o 50499998888)')
+					},
+					{
+						label: __('Mensaje a Enviar'),
+						fieldname: 'message',
+						fieldtype: 'Small Text',
+						default: data.default_message
+					}
+				],
+				primary_action_label: __('Abrir en WhatsApp'),
+				primary_action: function(values) {
+					send_leaf_invoice_whatsapp(frm, values);
+					dialog.hide();
 				}
+			});
+
+			dialog.add_custom_action(__('Descargar PDF'), function() {
+				const values = dialog.get_values();
+				download_leaf_invoice_pdf(frm, values.print_format, values.no_letterhead);
+			});
+
+			dialog.add_custom_action(__('Ver / Imprimir'), function() {
+				const values = dialog.get_values();
+				const print_url = frappe.urllib.get_full_url(`/app/print/${encodeURIComponent(frm.doctype)}/${encodeURIComponent(frm.doc.name)}?format=${encodeURIComponent(values.print_format || 'Standard')}&no_letterhead=${values.no_letterhead ? 1 : 0}`);
+				window.open(print_url, '_blank');
+			});
+
+			if (navigator.share) {
+				dialog.add_custom_action(__('Compartir (Sistema)'), async function() {
+					const values = dialog.get_values();
+					try {
+						await navigator.share({
+							title: frm.doc.name,
+							text: values.message
+						});
+						log_share_event(frm.doctype, frm.doc.name, values.print_format, 'native_share');
+						dialog.hide();
+					} catch (e) {
+						if (e.name !== 'AbortError') {
+							console.warn('Native share cancelled or error:', e);
+						}
+					}
+				});
 			}
-		} else {
-			trigger_fallback_download(blob, file_name, frm, print_format);
+
+			const $btn = dialog.get_primary_btn();
+			$btn.css({
+				'background-color': '#25D366',
+				'border-color': '#25D366',
+				'color': '#ffffff',
+				'font-weight': '600'
+			});
+
+			dialog.show();
 		}
-	} catch (err) {
-		frappe.hide_progress();
-		frappe.msgprint({
-			title: __('Error al Compartir'),
-			message: err.message || __('Ocurrió un error al preparar la factura.'),
-			indicator: 'red'
-		});
-	}
+	});
 }
 
-function trigger_fallback_download(blob, file_name, frm, print_format) {
+function update_leaf_share_dialog_message(dialog, frm, base_data) {
+	const values = dialog.get_values();
+	const host = window.location.origin;
+	const pdf_url = `${host}/api/method/erpnext.accounts.doctype.sales_invoice.share_invoice.download_pdf?doctype=${encodeURIComponent(frm.doctype)}&name=${encodeURIComponent(frm.doc.name)}&format=${encodeURIComponent(values.print_format || 'Standard')}&no_letterhead=${values.no_letterhead ? 1 : 0}`;
+
+	const msg = `Estimado(a) ${base_data.customer_name || 'Cliente'},\nLe compartimos el comprobante de su Factura ${frm.doc.name} por un monto de ${base_data.grand_total}.\nPuede consultar y descargar su factura en el siguiente enlace:\n${pdf_url}`;
+
+	dialog.set_value('message', msg);
+}
+
+function send_leaf_invoice_whatsapp(frm, values) {
+	let phone = (values.customer_phone || '').replace(/[^0-9]/g, '');
+
+	if (phone.length === 8) {
+		phone = '504' + phone;
+	}
+
+	const encoded_text = encodeURIComponent(values.message || '');
+	let wa_url = phone
+		? `https://api.whatsapp.com/send?phone=${phone}&text=${encoded_text}`
+		: `https://api.whatsapp.com/send?text=${encoded_text}`;
+
+	window.open(wa_url, '_blank');
+	log_share_event(frm.doctype, frm.doc.name, values.print_format, 'whatsapp');
+}
+
+function download_leaf_invoice_pdf(frm, print_format, no_letterhead) {
+	const params = $.param({
+		doctype: frm.doctype,
+		name: frm.doc.name,
+		format: print_format || 'Standard',
+		no_letterhead: no_letterhead ? 1 : 0
+	});
+	const pdf_url = frappe.urllib.get_full_url('/api/method/erpnext.accounts.doctype.sales_invoice.share_invoice.download_pdf?' + params);
+
 	const link = document.createElement('a');
-	link.href = URL.createObjectURL(blob);
-	link.download = file_name;
+	link.href = pdf_url;
+	link.download = `${frm.doc.name}.pdf`;
+	link.target = '_blank';
 	document.body.appendChild(link);
 	link.click();
 	document.body.removeChild(link);
 
-	frappe.msgprint({
-		title: __('Compartir Factura'),
-		message: __('El dispositivo o navegador actual no permite compartir archivos directamente desde LEAF. La factura en formato PDF se ha descargado en su dispositivo para que pueda compartirla manualmente.'),
-		indicator: 'orange'
-	});
-
-	log_share_event(frm.doctype, frm.doc.name, print_format, 'fallback');
+	log_share_event(frm.doctype, frm.doc.name, print_format, 'download');
 }
 
 function log_share_event(doctype, name, print_format, share_method) {
@@ -1257,8 +1306,6 @@ function log_share_event(doctype, name, print_format, share_method) {
 			print_format: print_format,
 			share_method: share_method
 		},
-		callback: function(r) {
-			// Silent analytics callback
-		}
+		callback: function(r) { }
 	});
 }
