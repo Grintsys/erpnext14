@@ -1154,7 +1154,8 @@ function leaf_share_sales_invoice(frm) {
 		args: {
 			doctype: frm.doctype,
 			name: frm.doc.name,
-			format: default_format
+			format: default_format,
+			host: window.location.origin
 		},
 		freeze: true,
 		freeze_message: __('Preparando datos para compartir...'),
@@ -1211,7 +1212,7 @@ function leaf_share_sales_invoice(frm) {
 
 			dialog.add_custom_action(__('Descargar PDF'), function() {
 				const values = dialog.get_values();
-				download_leaf_invoice_pdf(frm, values.print_format, values.no_letterhead);
+				download_leaf_invoice_pdf(frm, values.print_format, values.no_letterhead, data.share_key);
 			});
 
 			dialog.add_custom_action(__('Ver / Imprimir'), function() {
@@ -1254,7 +1255,12 @@ function leaf_share_sales_invoice(frm) {
 function update_leaf_share_dialog_message(dialog, frm, base_data) {
 	const values = dialog.get_values();
 	const host = window.location.origin;
-	const pdf_url = `${host}/api/method/erpnext.accounts.doctype.sales_invoice.share_invoice.download_pdf?doctype=${encodeURIComponent(frm.doctype)}&name=${encodeURIComponent(frm.doc.name)}&format=${encodeURIComponent(values.print_format || 'Standard')}&no_letterhead=${values.no_letterhead ? 1 : 0}`;
+	const encoded_doctype = encodeURIComponent(frm.doctype);
+	const encoded_name = encodeURIComponent(frm.doc.name);
+	const encoded_format = encodeURIComponent(values.print_format || 'Standard');
+	const key = base_data.share_key || '';
+
+	const pdf_url = `${host}/api/method/erpnext.accounts.doctype.sales_invoice.share_invoice.download_pdf?doctype=${encoded_doctype}&name=${encoded_name}&format=${encoded_format}&no_letterhead=${values.no_letterhead ? 1 : 0}&key=${key}`;
 
 	const msg = `Estimado(a) ${base_data.customer_name || 'Cliente'},\nLe compartimos el comprobante de su Factura ${frm.doc.name} por un monto de ${base_data.grand_total}.\nPuede consultar y descargar su factura en el siguiente enlace:\n${pdf_url}`;
 
@@ -1277,12 +1283,13 @@ function send_leaf_invoice_whatsapp(frm, values) {
 	log_share_event(frm.doctype, frm.doc.name, values.print_format, 'whatsapp');
 }
 
-function download_leaf_invoice_pdf(frm, print_format, no_letterhead) {
+function download_leaf_invoice_pdf(frm, print_format, no_letterhead, key) {
 	const params = $.param({
 		doctype: frm.doctype,
 		name: frm.doc.name,
 		format: print_format || 'Standard',
-		no_letterhead: no_letterhead ? 1 : 0
+		no_letterhead: no_letterhead ? 1 : 0,
+		key: key || ''
 	});
 	const pdf_url = frappe.urllib.get_full_url('/api/method/erpnext.accounts.doctype.sales_invoice.share_invoice.download_pdf?' + params);
 
