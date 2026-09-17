@@ -116,15 +116,19 @@ def download_pdf(doctype, name, format=None, no_letterhead=0, letterhead=None, k
 		except Exception:
 			frappe.local.assets_json = {}
 
-	html = frappe.get_print(
-		doctype=doctype,
-		name=name,
-		print_format=format,
-		doc=doc,
-		no_letterhead=no_letterhead,
-		letterhead=letterhead,
-		as_pdf=False
-	)
+	frappe.flags.ignore_print_permissions = True
+	try:
+		html = frappe.get_print(
+			doctype=doctype,
+			name=name,
+			print_format=format,
+			doc=doc,
+			no_letterhead=no_letterhead,
+			letterhead=letterhead,
+			as_pdf=False
+		)
+	finally:
+		frappe.flags.ignore_print_permissions = False
 
 	bench_path = frappe.utils.get_bench_path()
 	site_path = frappe.get_site_path()
