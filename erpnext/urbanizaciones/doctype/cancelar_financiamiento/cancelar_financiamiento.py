@@ -54,10 +54,14 @@ class CancelarFinanciamiento(Document):
 				('Cancelado', financ_name, 'Pendiente', 'Refinanciado')
 			)
 
-			# Cambiar el estado del activo a 'Disponible'		
-			activo = frappe.get_doc('Activos', activo_name)
-			activo.status = 'Disponible'
-			activo.save(ignore_permissions=True)
+			# Cambiar el estado de todos los activos vinculados a 'Disponible'
+			fin_doc = frappe.get_doc('Financiamientos', financ_name)
+			all_activos = fin_doc.get_all_linked_activos() if hasattr(fin_doc, "get_all_linked_activos") else ([fin_doc.activos] if getattr(fin_doc, "activos", None) else [])
+			if activo_name and activo_name not in all_activos:
+				all_activos.append(activo_name)
+
+			for act_n in all_activos:
+				frappe.db.set_value('Activos', act_n, 'status', 'Disponible', update_modified=False)
 
 			# Commit the transaction
 			frappe.db.commit()

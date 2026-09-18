@@ -342,13 +342,18 @@ doc_events = {
 			"erpnext.regional.italy.utils.sales_invoice_on_submit",
 			"erpnext.regional.saudi_arabia.utils.create_qr_code",
 			"erpnext.erpnext_integrations.taxjar_integration.create_transaction",
+			"erpnext.urbanizaciones.sales_invoice_events.on_submit",
 		],
 		"on_cancel": [
 			"erpnext.regional.italy.utils.sales_invoice_on_cancel",
 			"erpnext.erpnext_integrations.taxjar_integration.delete_transaction",
 			"erpnext.regional.saudi_arabia.utils.delete_qr_code_file",
+			"erpnext.urbanizaciones.sales_invoice_events.on_cancel",
 		],
-		"on_trash": "erpnext.regional.check_deletion_permission",
+		"on_trash": [
+			"erpnext.regional.check_deletion_permission",
+			"erpnext.urbanizaciones.sales_invoice_events.on_trash",
+		],
 	},
 	"POS Invoice": {"on_submit": ["erpnext.regional.saudi_arabia.utils.create_qr_code"]},
 	"Purchase Invoice": {

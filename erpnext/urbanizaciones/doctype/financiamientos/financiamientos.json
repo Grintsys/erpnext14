@@ -17,6 +17,8 @@
   "activos",
   "fecha_inicio",
   "status",
+  "section_break_activos_detalle",
+  "activos_detalle",
   "section_break_2",
   "configuracion_financiamiento",
   "politicas_financieras_snapshot",
@@ -81,7 +83,7 @@
   {
    "fieldname": "fecha_inicio",
    "fieldtype": "Date",
-   "label": "Fecha de incio",
+   "label": "Fecha de inicio",
    "reqd": 1
   },
   {
@@ -92,6 +94,19 @@
    "label": "Estado",
    "options": "Borrador\nActivo\nCancelado\nRefinanciado\nCompletado",
    "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_activos_detalle",
+   "fieldtype": "Section Break",
+   "label": "Lotes / Activos Adicionales o Múltiples"
+  },
+  {
+   "description": "Permite asociar m\u00faltiples lotes/activos a un mismo contrato de financiamiento.",
+   "fieldname": "activos_detalle",
+   "fieldtype": "Table",
+   "label": "Detalle de Activos",
+   "options": "Financiamiento Activo Detalle"
   },
   {
    "fieldname": "section_break_1",

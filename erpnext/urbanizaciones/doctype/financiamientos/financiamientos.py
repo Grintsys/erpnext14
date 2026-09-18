@@ -325,15 +325,73 @@ class Financiamientos(Document):
             self.saldo_actual = flt(cuota * plazo, 2)
             self.total_financiado = flt((cuota * plazo) + prima, 2)
 
+    def get_all_linked_activos(self):
+        activos_list = []
+        if self.get("activos"):
+            activos_list.append(self.activos)
+        for row in self.get("activos_detalle") or []:
+            if getattr(row, "activo", None) and row.activo not in activos_list:
+                activos_list.append(row.activo)
+        return activos_list
+
     def validate_activo_urbanizacion(self):
-        if self.activos and self.urbanizaciones:
-            activo_urbanizacion = frappe.db.get_value('Activos', self.activos, 'urbanizaciones')
-            if activo_urbanizacion != self.urbanizaciones:
+        all_activos = self.get_all_linked_activos()
+        if not all_activos:
+            if not self.activos and not self.get("activos_detalle"):
+                frappe.throw(_("Debe seleccionar al menos un Activo para el financiamiento."))
+            return
+
+        for act_name in all_activos:
+            act_data = frappe.db.get_value("Activos", act_name, ["urbanizaciones", "status", "descripcion_lote"], as_dict=True)
+            if not act_data:
+                continue
+
+            if self.urbanizaciones and act_data.urbanizaciones != self.urbanizaciones:
                 frappe.throw(
-                    _("El Activo seleccionado ({0}) no pertenece a la Urbanización seleccionada ({1}).").format(
-                        self.activos, self.urbanizaciones
+                    _("El Activo ({0} - {1}) no pertenece a la Urbanización seleccionada ({2}).").format(
+                        act_name, act_data.descripcion_lote or "", self.urbanizaciones
                     )
                 )
+
+            # Validar si el activo ya está financiado o vendido en otro contrato activo
+            if act_data.status in ("Financiado", "Refinanciado", "Vendido") and self.docstatus == 0:
+                otro_fin = frappe.db.sql(
+                    """
+                    SELECT f.name, f.status
+                    FROM `tabFinanciamientos` f
+                    WHERE f.name != %s
+                      AND f.status IN ('Activo', 'Refinanciado', 'Completado')
+                      AND (
+                          f.activos = %s
+                          OR EXISTS (
+                              SELECT 1 FROM `tabFinanciamiento Activo Detalle` fad
+                              WHERE fad.parent = f.name AND fad.activo = %s
+                          )
+                      )
+                    LIMIT 1
+                    """,
+                    (self.name or "NUEVO", act_name, act_name),
+                    as_dict=True
+                )
+                if otro_fin:
+                    frappe.throw(
+                        _(
+                            "El Activo <b>{0} ({1})</b> ya se encuentra con estado <b>{2}</b> en el contrato <b>{3}</b>.<br>"
+                            "Únicamente se pueden financiar activos disponibles o reservados."
+                        ).format(
+                            act_name, act_data.descripcion_lote or "", act_data.status, otro_fin[0].name
+                        )
+                    )
+
+    def on_trash(self):
+        """
+        Al eliminar un financiamiento, liberar todos los activos asociados a estado Disponible.
+        """
+        all_activos = self.get_all_linked_activos()
+        for act_name in all_activos:
+            cur_status = frappe.db.get_value("Activos", act_name, "status")
+            if cur_status in ("Financiado", "Refinanciado"):
+                frappe.db.set_value("Activos", act_name, "status", "Disponible", update_modified=False)
 
 @frappe.whitelist()
 def generar_cuotas(docname):
@@ -463,12 +521,11 @@ def generar_cuotas(docname):
             doc.status = 'Activo'
             activo_status = 'Financiado'
 
-        # actualizar estado del Activo ligado (si existe)
-        activo_name = doc.get('activos')
-        if activo_name:
+        # actualizar estado de TODOS los Activos ligados (activos + activos_detalle)
+        all_activos = doc.get_all_linked_activos()
+        for act_name in all_activos:
             try:
-                # actualizar directamente en DB para evitar problemas con docstatus del Activo
-                frappe.db.set_value('Activos', activo_name, 'status', activo_status)
+                frappe.db.set_value('Activos', act_name, 'status', activo_status)
             except Exception:
                 frappe.log_error(frappe.get_traceback(), 'Financiamientos.generar_cuotas - actualizar Activo')
 
@@ -586,4 +643,60 @@ def financiamiento_query(doctype, txt, searchfield, start, page_len, filters):
     values["page_len"] = int(page_len or 20)
 
     return frappe.db.sql(query, values)
+
+
+@frappe.whitelist()
+@frappe.validate_and_sanitize_search_inputs
+def activo_disponible_query(doctype, txt, searchfield, start, page_len, filters):
+    if isinstance(filters, str):
+        import json
+        filters = json.loads(filters)
+    filters = filters or {}
+
+    urbanizaciones = filters.get("urbanizaciones")
+    current_doc = filters.get("current_doc")
+
+    conditions = ["(a.status IN ('Disponible', 'Reservado') OR a.status IS NULL OR a.status = '')"]
+    values = {"start": int(start or 0), "page_len": int(page_len or 20)}
+
+    if urbanizaciones:
+        conditions.append("a.urbanizaciones = %(urbanizaciones)s")
+        values["urbanizaciones"] = urbanizaciones
+
+    if current_doc:
+        # Permitir seleccionar los activos que ya están asociados a este financiamiento actual
+        conditions[-1] = """(
+            (a.status IN ('Disponible', 'Reservado') OR a.status IS NULL OR a.status = '')
+            OR a.name IN (
+                SELECT f.activos FROM `tabFinanciamientos` f WHERE f.name = %(current_doc)s
+                UNION
+                SELECT fad.activo FROM `tabFinanciamiento Activo Detalle` fad WHERE fad.parent = %(current_doc)s
+            )
+        )"""
+        values["current_doc"] = current_doc
+
+    if txt:
+        conditions.append("(a.name LIKE %(txt)s OR a.descripcion_lote LIKE %(txt)s)")
+        values["txt"] = f"%{txt}%"
+        values["txt_start"] = f"{txt}%"
+    else:
+        values["txt_start"] = "%"
+
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+    query = f"""
+        SELECT
+            a.name,
+            COALESCE(NULLIF(a.descripcion_lote, ''), a.name) as descripcion_lote,
+            COALESCE(NULLIF(a.status, ''), 'Disponible') as status,
+            a.precio
+        FROM `tabActivos` a
+        WHERE {where_clause}
+        ORDER BY
+            (CASE WHEN a.name LIKE %(txt_start)s THEN 0 ELSE 1 END),
+            a.modified DESC
+        LIMIT %(start)s, %(page_len)s
+    """
+    return frappe.db.sql(query, values)
+
 

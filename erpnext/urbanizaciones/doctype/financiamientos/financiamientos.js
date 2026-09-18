@@ -3,13 +3,28 @@
 
 frappe.ui.form.on('Financiamientos', {
     setup: function(frm) {
+        // Filtrar activos disponibles o reservados para la urbanización seleccionada
         frm.set_query('activos', function() {
             return {
+                query: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.activo_disponible_query',
                 filters: {
-                    urbanizaciones: frm.doc.urbanizaciones || ''
+                    urbanizaciones: frm.doc.urbanizaciones || '',
+                    current_doc: frm.doc.name || ''
                 }
             };
         });
+
+        // Filtrar en la tabla de múltiples activos
+        frm.set_query('activo', 'activos_detalle', function() {
+            return {
+                query: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.activo_disponible_query',
+                filters: {
+                    urbanizaciones: frm.doc.urbanizaciones || '',
+                    current_doc: frm.doc.name || ''
+                }
+            };
+        });
+
         frm.set_query('centro_costo', function() {
             return {
                 filters: {
@@ -19,9 +34,7 @@ frappe.ui.form.on('Financiamientos', {
         });
     },
 
-    onload: function(frm)
-    {
-		// Calculate capital_financiado on load if fields already have values
+    onload: function(frm) {
         calculate_capital_financiero(frm);
         calculate_cuota_estimada(frm);
         calculate_proxima_fecha(frm);
@@ -32,13 +45,65 @@ frappe.ui.form.on('Financiamientos', {
         const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
         const isDraft = frm.doc.docstatus === 0;
 
+        // Indicador de estado del financiamiento y mora
+        if (!frm.is_new() && frm.doc.status) {
+            let hasOverdue = false;
+            let totalMora = 0;
+            let cuotasPagadas = 0;
+            let totalPagado = 0;
+            let cuotasPendientes = 0;
+
+            if (hasCuotas) {
+                const today = frappe.datetime.get_today();
+                frm.doc.cuotas.forEach(c => {
+                    if (c.status === 'Pagado' || c.status === 'Anticipada') {
+                        cuotasPagadas += 1;
+                        totalPagado += flt(c.total_cuota);
+                    } else if (c.status === 'Pendiente') {
+                        cuotasPendientes += 1;
+                        if (c.fecha_vencimiento_cuota && c.fecha_vencimiento_cuota < today) {
+                            hasOverdue = true;
+                            totalMora += flt(c.mora);
+                        }
+                    }
+                });
+            }
+
+            if (frm.doc.status === 'Completado') {
+                frm.page.set_indicator(__('Completado'), 'blue');
+            } else if (frm.doc.status === 'Cancelado') {
+                frm.page.set_indicator(__('Cancelado'), 'red');
+            } else if (hasOverdue) {
+                frm.page.set_indicator(__('En Mora (L %s)', [format_currency(totalMora)]), 'red');
+            } else if (frm.doc.status === 'Activo') {
+                frm.page.set_indicator(__('Al Día (Activo)'), 'green');
+            } else if (frm.doc.status === 'Refinanciado') {
+                frm.page.set_indicator(__('Refinanciado'), 'purple');
+            } else {
+                frm.page.set_indicator(__(frm.doc.status), 'orange');
+            }
+
+            // Resumen estadístico
+            if (hasCuotas && frm.dashboard) {
+                frm.dashboard.clear_headline();
+                let summary_html = `
+                    <div style="display: flex; gap: 20px; font-size: 13px; padding: 5px 0;">
+                        <span><b>Cuotas Pagadas:</b> ${cuotasPagadas} / ${frm.doc.cuotas.length}</span>
+                        <span><b>Total Pagado:</b> ${format_currency(totalPagado)}</span>
+                        <span><b>Saldo Pendiente:</b> ${format_currency(frm.doc.saldo_actual || 0)}</span>
+                        ${totalMora > 0 ? `<span style="color: var(--text-color-danger, #e24c4c);"><b>Mora Acumulada:</b> ${format_currency(totalMora)}</span>` : ''}
+                    </div>
+                `;
+                frm.dashboard.set_headline(summary_html);
+            }
+        }
+
         // Mostrar botón 'Generar cuotas' mientras el documento esté en Borrador (docstatus == 0)
         if (isDraft) {
             let btn = frm.add_custom_button(__('Generar cuotas'), function() {
                 const required_fields = [
                     'customer',
                     'urbanizaciones',
-                    'activos',
                     'fecha_inicio',
                     'monto_contrato',
                     'configuracion_financiamiento',
@@ -55,8 +120,10 @@ frappe.ui.form.on('Financiamientos', {
                     return v !== undefined && v !== null && v !== '' && !(typeof v === 'number' && isNaN(v));
                 });
 
-                if (!allFilled) {
-                    frappe.show_alert({ message: __('Complete todos los campos requeridos para generar las cuotas'), indicator: 'red' });
+                const hasAsset = frm.doc.activos || (Array.isArray(frm.doc.activos_detalle) && frm.doc.activos_detalle.length > 0);
+
+                if (!allFilled || !hasAsset) {
+                    frappe.show_alert({ message: __('Complete todos los campos requeridos y seleccione al menos un Activo'), indicator: 'red' });
                     return;
                 }
 
@@ -105,12 +172,12 @@ frappe.ui.form.on('Financiamientos', {
             }
         }
 
-        // lock 'es_refinanciamiento' if user selected "Si" or if cuotas already exist
+        // Lock 'es_refinanciamiento' si ya existen cuotas
         const lockField = (frm.doc.es_refinanciamiento === 'Si') || hasCuotas;
         frm.set_df_property('es_refinanciamiento', 'read_only', lockField ? 1 : 0);
 
-        // Botón para abrir "Generar Factura" en una NUEVA pestaña del navegador
-        if (!frm.is_new() && hasCuotas) {
+        // Botón para abrir "Generar Factura"
+        if (!frm.is_new() && hasCuotas && frm.doc.status !== 'Completado' && frm.doc.status !== 'Cancelado') {
             frm.add_custom_button(__('Generar Factura'), function() {
                 if (frm.is_dirty()) {
                     frappe.show_alert({ message: __('Guarde los cambios antes de abrir Generar Factura'), indicator: 'warning' });
@@ -120,7 +187,7 @@ frappe.ui.form.on('Financiamientos', {
                     `/app/generar-factura/new-generar-factura-1?customer=${encodeURIComponent(frm.doc.customer || '')}&financiamiento=${encodeURIComponent(frm.doc.name || '')}`
                 );
                 window.open(url, '_blank');
-            });
+            }).addClass('btn-primary');
 
             frm.add_custom_button(__('Actualizar Políticas de Cobro'), function() {
                 frappe.confirm(
@@ -142,7 +209,6 @@ frappe.ui.form.on('Financiamientos', {
     },
 
     es_refinanciamiento: function(frm) {
-        // if user sets it to "Si" lock it immediately; if "No" only unlock when no cuotas
         const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
         if (frm.doc.es_refinanciamiento === 'Si') {
             frm.set_df_property('es_refinanciamiento', 'read_only', 1);
@@ -152,6 +218,15 @@ frappe.ui.form.on('Financiamientos', {
     },
 
     urbanizaciones: function(frm) {
+        if (frm.doc.urbanizaciones) {
+            if (!frm.doc.centro_costo) {
+                frappe.db.get_value('Urbanizaciones', frm.doc.urbanizaciones, 'cost_center', function(r) {
+                    if (r && r.cost_center) {
+                        frm.set_value('centro_costo', r.cost_center);
+                    }
+                });
+            }
+        }
         if (frm.doc.activos) {
             frappe.db.get_value('Activos', frm.doc.activos, 'urbanizaciones', function(r) {
                 if (r && r.urbanizaciones !== frm.doc.urbanizaciones) {
@@ -163,124 +238,166 @@ frappe.ui.form.on('Financiamientos', {
 
     activos: function(frm) {
         if (frm.doc.activos) {
-            frappe.db.get_value('Activos', frm.doc.activos, 'centro_de_costo', function(r) {
-                if (r && r.centro_de_costo) {
-                    frm.set_value('centro_costo', r.centro_de_costo);
+            frappe.db.get_value('Activos', frm.doc.activos, ['centro_de_costo', 'precio', 'status', 'descripcion_lote'], function(r) {
+                if (r) {
+                    if (r.centro_de_costo) {
+                        frm.set_value('centro_costo', r.centro_de_costo);
+                    }
+                    if (r.precio && (!frm.doc.monto_contrato || frm.doc.monto_contrato === 0)) {
+                        frm.set_value('monto_contrato', r.precio);
+                    }
+                    // Validar estado
+                    if (r.status && r.status !== 'Disponible' && r.status !== 'Reservado' && frm.is_new()) {
+                        frappe.msgprint({
+                            title: __('Activo no Disponible'),
+                            indicator: 'orange',
+                            message: __('Advertencia: El activo <b>{0}</b> tiene estado <b>{1}</b>. Asegúrese de que esté disponible para venta.', [frm.doc.activos, r.status])
+                        });
+                    }
                 }
             });
         }
     },
 
-    monto_contrato: function(frm)
-    {
+    monto_contrato: function(frm) {
         calculate_capital_financiero(frm);
         calculate_cuota_estimada(frm);        
     },
 
-    prima: function(frm)
-    {
+    prima: function(frm) {
         calculate_capital_financiero(frm);
         calculate_cuota_estimada(frm);
     },
 
-    interes_anual: function(frm)
-    {
+    interes_anual: function(frm) {
         calculate_cuota_estimada(frm);
     },
 
-    plazo_meses: function(frm)
-    {
+    plazo_meses: function(frm) {
         calculate_cuota_estimada(frm);
     },
 
-    fecha_inicio: function(frm)
-    {
+    fecha_inicio: function(frm) {
         calculate_proxima_fecha(frm);
     },
 
-    dia_vencimiento_cuota: function(frm)
-    {
+    dia_vencimiento_cuota: function(frm) {
         calculate_proxima_fecha(frm);
     },
 
-    capital_financiado: function(frm)
-    {
+    capital_financiado: function(frm) {
         calculate_saldo_actual(frm);        
     }
 });
 
-// Function to calculate capital_financiado
-function calculate_capital_financiero(frm)
-{
-    let monto = parseFloat(frm.doc.monto_contrato) || 0;
-    let prima = parseFloat(frm.doc.prima) || 0;    
+// Eventos de la tabla de múltiples activos
+frappe.ui.form.on('Financiamiento Activo Detalle', {
+    activo: function(frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+        if (row.activo) {
+            frappe.db.get_value('Activos', row.activo, ['descripcion_lote', 'precio', 'centro_de_costo', 'status'], function(r) {
+                if (r) {
+                    frappe.model.set_value(cdt, cdn, 'descripcion_lote', r.descripcion_lote || '');
+                    frappe.model.set_value(cdt, cdn, 'precio', r.precio || 0);
+                    frappe.model.set_value(cdt, cdn, 'centro_de_costo', r.centro_de_costo || '');
+                    
+                    if (r.status && r.status !== 'Disponible' && r.status !== 'Reservado' && frm.is_new()) {
+                        frappe.show_alert({
+                            message: __('El activo {0} tiene estado {1}', [row.activo, r.status]),
+                            indicator: 'orange'
+                        });
+                    }
 
-    const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
-    if (frm.is_new() || !hasCuotas) {
-        frm.set_value('capital_financiado', monto - prima);    
+                    // Sincronizar activos si está vacío
+                    if (!frm.doc.activos) {
+                        frm.set_value('activos', row.activo);
+                    }
+
+                    recalculate_multi_assets_total(frm);
+                }
+            });
+        }
+    },
+
+    precio: function(frm) {
+        recalculate_multi_assets_total(frm);
+    },
+
+    activos_detalle_remove: function(frm) {
+        recalculate_multi_assets_total(frm);
+    }
+});
+
+function recalculate_multi_assets_total(frm) {
+    if (frm.doc.docstatus === 0 && Array.isArray(frm.doc.activos_detalle) && frm.doc.activos_detalle.length > 0) {
+        let total = 0;
+        frm.doc.activos_detalle.forEach(r => {
+            total += flt(r.precio);
+        });
+        if (total > 0) {
+            frm.set_value('monto_contrato', flt(total, 2));
+        }
     }
 }
 
-// Function to calculate cuota_estimada
-function calculate_cuota_estimada(frm)
-{
-    let interes_anual = parseFloat(frm.doc.interes_anual) || 0;
-    let capital = parseFloat(frm.doc.capital_financiado) || 0;
+function calculate_capital_financiero(frm) {
+    let monto = flt(frm.doc.monto_contrato);
+    let prima = flt(frm.doc.prima);    
+
+    const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
+    if (frm.is_new() || !hasCuotas) {
+        frm.set_value('capital_financiado', flt(monto - prima, 2));    
+    }
+}
+
+function calculate_cuota_estimada(frm) {
+    let interes_anual = flt(frm.doc.interes_anual);
+    let capital = flt(frm.doc.capital_financiado);
     let cuotas = parseInt(frm.doc.plazo_meses) || 0;
 
-    if (interes_anual > 0 && capital > 0 && cuotas > 0)
-    {
-        let r = (interes_anual / 100) / 12;
-        let n = cuotas;
-        let pv = capital;
-
-        let cuota = (r * pv) / (1 - Math.pow(1 + r, -n));
-
-        frm.set_value('cuota_estimada', Math.round(cuota * 100) / 100);
-    }
-    else
-    {
+    if (capital > 0 && cuotas > 0) {
+        if (interes_anual > 0) {
+            let r = (interes_anual / 100.0) / 12.0;
+            let n = cuotas;
+            let pv = capital;
+            let cuota = (r * pv) / (1.0 - Math.pow(1.0 + r, -n));
+            frm.set_value('cuota_estimada', flt(cuota, 2));
+        } else {
+            frm.set_value('cuota_estimada', flt(capital / cuotas, 2));
+        }
+    } else {
         frm.set_value('cuota_estimada', 0);
     }
     calculate_saldo_actual(frm);
 }
 
-function calculate_proxima_fecha(frm)
-{
+function calculate_proxima_fecha(frm) {
     if (frm.is_new()){
-        //Todo: si ya existe el plan de pago, mostrar la fecha de vencimiento de la cuota correspondiente
-    
         const fecha_inicio = frm.doc.fecha_inicio;
         const dia_vencimiento = frm.doc.dia_vencimiento_cuota;
 
-        if (fecha_inicio && dia_vencimiento)
-        {
+        if (fecha_inicio && dia_vencimiento) {
             let fecha = frappe.datetime.str_to_obj(fecha_inicio);
-            
             fecha.setMonth(fecha.getMonth() + 1);
             fecha.setDate(dia_vencimiento);
-
             frm.set_value('fecha_vencimiento_cuota', frappe.datetime.obj_to_str(fecha));
-        }
-        else
-        {
+        } else {
             frm.set_value('fecha_vencimiento_cuota', null);
         }
     }    
 }
 
-function calculate_saldo_actual(frm)
-{
+function calculate_saldo_actual(frm) {
     const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
     if (frm.is_new() || !hasCuotas) {
-        let cuota = parseFloat(frm.doc.cuota_estimada) || 0;
+        let cuota = flt(frm.doc.cuota_estimada);
         let plazo = parseInt(frm.doc.plazo_meses) || 0;
-        let prima = parseFloat(frm.doc.prima) || 0;
+        let prima = flt(frm.doc.prima);
 
-        let saldo_actual = cuota * plazo;
-        let total_financiado = saldo_actual + prima;
+        let saldo_actual = flt(cuota * plazo, 2);
+        let total_financiado = flt(saldo_actual + prima, 2);
 
-        frm.set_value('saldo_actual', Math.round(saldo_actual * 100) / 100);
-        frm.set_value('total_financiado', Math.round(total_financiado * 100) / 100);
+        frm.set_value('saldo_actual', saldo_actual);
+        frm.set_value('total_financiado', total_financiado);
     }
 }

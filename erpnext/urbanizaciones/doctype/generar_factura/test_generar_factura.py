@@ -273,6 +273,22 @@ class TestGenerarFactura(FrappeTestCase):
 		# 15,000 (1.5 cuotas) NO está en cum_sums
 		self.assertNotIn(15000.0, cum_sums)
 
+	def test_sales_invoice_events_reversal_structure(self):
+		"""Verifica que el manejador de eventos de reversión esté debidamente importable y estructurado."""
+		from erpnext.urbanizaciones.sales_invoice_events import (
+			on_submit,
+			on_cancel,
+			on_trash,
+			process_financing_on_submit,
+			process_financing_on_cancel,
+			process_financing_on_trash
+		)
+
+		self.assertTrue(callable(on_submit))
+		self.assertTrue(callable(on_cancel))
+		self.assertTrue(callable(on_trash))
+
+
 
 
 
