@@ -160,7 +160,7 @@ def get_dashboard_data(
         "values": cust_values
     }
 
-    # --- E. TOP 10 PRODUCTOS MÁS FACTURADOS ---
+    # --- E. ANÁLISIS DE PARETO Y PRODUCTOS MÁS FACTURADOS ---
     products_query = f"""
         SELECT 
             sii.item_code,
@@ -172,9 +172,39 @@ def get_dashboard_data(
         WHERE {where_sql}
         GROUP BY sii.item_code
         ORDER BY total_amount DESC
-        LIMIT 10
     """
     products_raw = frappe.db.sql(products_query, params, as_dict=True)
+
+    total_sales_all_products = sum([flt(p["total_amount"]) for p in products_raw]) or 1.0
+
+    pareto_labels = []
+    pareto_amounts = []
+    pareto_percentages = []
+    cumulative_amount = 0.0
+
+    # Procesar los principales productos para el gráfico de Pareto (hasta top 15)
+    pareto_products = products_raw[:15]
+    for p in pareto_products:
+        p_amount = flt(p["total_amount"], 2)
+        cumulative_amount += p_amount
+        cum_pct = round((cumulative_amount / total_sales_all_products) * 100, 1)
+        
+        item_label = p["item_name"] if p["item_name"] else p["item_code"]
+        if len(item_label) > 20:
+            item_label = item_label[:18] + "..."
+
+        pareto_labels.append(item_label)
+        pareto_amounts.append(p_amount)
+        pareto_percentages.append(cum_pct)
+
+    pareto_chart = {
+        "labels": pareto_labels,
+        "datasets": [
+            {"name": _("Monto Facturado (HNL)"), "values": pareto_amounts, "chartType": "bar"},
+            {"name": _("% Acumulado (Pareto)"), "values": pareto_percentages, "chartType": "line"}
+        ],
+        "total_revenue": flt(total_sales_all_products, 2)
+    }
 
     top_products = [
         {
@@ -182,7 +212,7 @@ def get_dashboard_data(
             "item_name": p["item_name"],
             "qty": flt(p["total_qty"], 2),
             "amount": flt(p["total_amount"], 2)
-        } for p in products_raw
+        } for p in products_raw[:10]
     ]
 
     # --- F. RECIENTES FACTURAS DESTACADAS (TOP 15) ---
@@ -216,6 +246,7 @@ def get_dashboard_data(
 
     return {
         "kpis": kpis,
+        "pareto_chart": pareto_chart,
         "trend_chart": trend_chart,
         "payment_chart": payment_chart,
         "top_customers": top_customers,

@@ -47,6 +47,36 @@ class TableroFacturasVentaApp {
 
     setup_ui_layout() {
         let body_html = `
+            <style>
+                @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@600;700;800;900&family=Inter:wght@600;700;800;900&display=swap');
+
+                .tablero-sales-invoice-container {
+                    font-family: 'Glacial Indifference', 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+                }
+                .kpi-metric-card h3, 
+                .kpi-metric-card .kpi-value {
+                    color: #ffffff !important;
+                    font-family: 'Glacial Indifference', 'Montserrat', 'Inter', sans-serif !important;
+                    font-weight: 800 !important;
+                    font-size: 1.7rem !important;
+                    letter-spacing: -0.5px !important;
+                    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.25) !important;
+                }
+                .kpi-metric-card .kpi-title {
+                    color: rgba(255, 255, 255, 0.95) !important;
+                    font-family: 'Glacial Indifference', 'Montserrat', 'Inter', sans-serif !important;
+                    font-weight: 700 !important;
+                    letter-spacing: 0.6px !important;
+                    font-size: 0.78rem !important;
+                    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+                }
+                .kpi-metric-card small,
+                .kpi-metric-card .kpi-subtitle {
+                    color: rgba(255, 255, 255, 0.82) !important;
+                    font-weight: 500 !important;
+                    font-size: 0.8rem !important;
+                }
+            </style>
             <div class="tablero-sales-invoice-container p-3" style="background: #f8f9fa; min-height: 100vh;">
                 <!-- SECCIÓN DE FILTROS PRINCIPALES -->
                 <div class="card mb-4" style="border-radius: 10px; border: 1px solid #e2e8f0; box-shadow: 0 2px 4px rgba(0,0,0,0.02); background: #ffffff; padding: 16px;">
@@ -62,66 +92,92 @@ class TableroFacturasVentaApp {
                     </div>
                 </div>
 
-                <!-- SECCIÓN DE KPIS (METRIC CARDS) -->
+                <!-- SECCIÓN DE KPIS (METRIC CARDS) - 2 FILAS X 3 COLUMNAS -->
+                <!-- FILA 1: AZULES GRINTSYS -->
+                <div class="row mb-3">
+                    <div class="col-lg-4 col-md-6 mb-3">
+                        <div class="card p-3 border-0 kpi-metric-card" style="border-radius: 10px; background: linear-gradient(135deg, #1e3a5f 0%, #2c3e50 100%); color: #ffffff; box-shadow: 0 4px 6px rgba(44,62,80,0.25);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="kpi-title text-uppercase">${__('Total Facturado')}</span>
+                                <i class="fa fa-line-chart fa-lg" style="opacity: 0.9; color: #a5d6a7;"></i>
+                            </div>
+                            <h3 class="mb-0 kpi-value" id="kpi-grand-total">L 0.00</h3>
+                            <small class="kpi-subtitle mt-1" id="kpi-net-total">${__('Neto')}: L 0.00</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6 mb-3">
+                        <div class="card p-3 border-0 kpi-metric-card" style="border-radius: 10px; background: linear-gradient(135deg, #1b2a4a 0%, #283e68 100%); color: #ffffff; box-shadow: 0 4px 6px rgba(27,42,74,0.25);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="kpi-title text-uppercase">${__('Facturas Emitidas')}</span>
+                                <i class="fa fa-file-text-o fa-lg" style="opacity: 0.9; color: #a5d6a7;"></i>
+                            </div>
+                            <h3 class="mb-0 kpi-value" id="kpi-invoice-count">0</h3>
+                            <small class="kpi-subtitle mt-1">${__('Documentos Validados')}</small>
+                        </div>
+                    </div>
+                    <div class="col-lg-4 col-md-6 mb-3">
+                        <div class="card p-3 border-0 kpi-metric-card" style="border-radius: 10px; background: linear-gradient(135deg, #2b3e4a 0%, #3a506b 100%); color: #ffffff; box-shadow: 0 4px 6px rgba(43,62,74,0.25);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <span class="kpi-title text-uppercase">${__('Ticket Promedio')}</span>
+                                <i class="fa fa-calculator fa-lg" style="opacity: 0.9; color: #90caf9;"></i>
+                            </div>
+                            <h3 class="mb-0 kpi-value" id="kpi-avg-ticket">L 0.00</h3>
+                            <small class="kpi-subtitle mt-1">${__('Promedio por Venta')}</small>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FILA 2: VERDES GRINTSYS -->
                 <div class="row mb-4">
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card p-3 border-0" style="border-radius: 10px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); color: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div class="col-lg-4 col-md-6 mb-3">
+                        <div class="card p-3 border-0 kpi-metric-card" style="border-radius: 10px; background: linear-gradient(135deg, #558b2f 0%, #7cb342 100%); color: #ffffff; box-shadow: 0 4px 6px rgba(124,179,66,0.3);">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small font-weight-bold text-uppercase">${__('Total Facturado')}</span>
-                                <i class="fa fa-line-chart fa-lg" style="opacity: 0.7;"></i>
+                                <span class="kpi-title text-uppercase">${__('Total Cobrado')}</span>
+                                <i class="fa fa-check-circle fa-lg" style="opacity: 0.95; color: #ffffff;"></i>
                             </div>
-                            <h3 class="mb-0 font-weight-bold" id="kpi-grand-total">L 0.00</h3>
-                            <small class="text-white-50 mt-1" id="kpi-net-total">${__('Neto')}: L 0.00</small>
+                            <h3 class="mb-0 kpi-value" id="kpi-paid-amount">L 0.00</h3>
+                            <small class="kpi-subtitle mt-1">${__('Ingresos Ingresados')}</small>
                         </div>
                     </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card p-3 border-0" style="border-radius: 10px; background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); color: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div class="col-lg-4 col-md-6 mb-3">
+                        <div class="card p-3 border-0 kpi-metric-card" style="border-radius: 10px; background: linear-gradient(135deg, #689f38 0%, #8bc34a 100%); color: #ffffff; box-shadow: 0 4px 6px rgba(104,159,56,0.3);">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small font-weight-bold text-uppercase">${__('Total Cobrado')}</span>
-                                <i class="fa fa-check-circle fa-lg" style="opacity: 0.7;"></i>
+                                <span class="kpi-title text-uppercase">${__('Pendiente Cobro')}</span>
+                                <i class="fa fa-clock-o fa-lg" style="opacity: 0.95; color: #ffffff;"></i>
                             </div>
-                            <h3 class="mb-0 font-weight-bold" id="kpi-paid-amount">L 0.00</h3>
-                            <small class="text-white-50 mt-1">${__('Ingresos Ingresados')}</small>
+                            <h3 class="mb-0 kpi-value" id="kpi-outstanding-amount">L 0.00</h3>
+                            <small class="kpi-subtitle mt-1">${__('Cuentas por Cobrar')}</small>
                         </div>
                     </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card p-3 border-0" style="border-radius: 10px; background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%); color: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                    <div class="col-lg-4 col-md-6 mb-3">
+                        <div class="card p-3 border-0 kpi-metric-card" style="border-radius: 10px; background: linear-gradient(135deg, #33691e 0%, #558b2f 100%); color: #ffffff; box-shadow: 0 4px 6px rgba(51,105,30,0.3);">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small font-weight-bold text-uppercase">${__('Pendiente Cobro')}</span>
-                                <i class="fa fa-clock-o fa-lg" style="opacity: 0.7;"></i>
+                                <span class="kpi-title text-uppercase">${__('ISV / Impuestos')}</span>
+                                <i class="fa fa-university fa-lg" style="opacity: 0.95; color: #ffffff;"></i>
                             </div>
-                            <h3 class="mb-0 font-weight-bold" id="kpi-outstanding-amount">L 0.00</h3>
-                            <small class="text-white-50 mt-1">${__('Cuentas por Cobrar')}</small>
+                            <h3 class="mb-0 kpi-value" id="kpi-total-taxes">L 0.00</h3>
+                            <small class="kpi-subtitle mt-1">${__('Impuestos Generados')}</small>
                         </div>
                     </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card p-3 border-0" style="border-radius: 10px; background: linear-gradient(135deg, #8e2de2 0%, #4a00e0 100%); color: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small font-weight-bold text-uppercase">${__('ISV / Impuestos')}</span>
-                                <i class="fa fa-university fa-lg" style="opacity: 0.7;"></i>
+                </div>
+
+                <!-- SECCIÓN ANÁLISIS DE PARETO (80/20 DE PRODUCTOS) -->
+                <div class="row mb-4">
+                    <div class="col-12">
+                        <div class="card border-0" style="border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); background: #fff; padding: 22px;">
+                            <div class="d-flex flex-wrap justify-content-between align-items-center mb-3" style="gap: 10px;">
+                                <div>
+                                    <h5 class="card-title font-weight-bold text-dark m-0">
+                                        <i class="fa fa-bar-chart mr-2" style="color: #1e3a5f;"></i>${__('Diagrama de Pareto (80/20) — Oportunidades Clave de Venta')}
+                                    </h5>
+                                    <small class="text-muted">${__('Identificación de los productos estratégicos que concentran el mayor porcentaje de los ingresos.')}</small>
+                                </div>
+                                <div class="d-flex align-items-center" style="gap: 8px;">
+                                    <span class="badge badge-pill" style="background-color: #2c3e50; color: #fff; padding: 6px 12px; font-size: 12px;"><i class="fa fa-square mr-1" style="color: #7cb342;"></i>${__('Monto Facturado (HNL)')}</span>
+                                    <span class="badge badge-pill" style="background-color: #7cb342; color: #fff; padding: 6px 12px; font-size: 12px;"><i class="fa fa-line-chart mr-1" style="color: #fff;"></i>${__('% Acumulado')}</span>
+                                </div>
                             </div>
-                            <h3 class="mb-0 font-weight-bold" id="kpi-total-taxes">L 0.00</h3>
-                            <small class="text-white-50 mt-1">${__('Impuestos Generados')}</small>
-                        </div>
-                    </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card p-3 border-0" style="border-radius: 10px; background: linear-gradient(135deg, #2193b0 0%, #6dd5ed 100%); color: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small font-weight-bold text-uppercase">${__('Facturas Emitidas')}</span>
-                                <i class="fa fa-file-text-o fa-lg" style="opacity: 0.7;"></i>
-                            </div>
-                            <h3 class="mb-0 font-weight-bold" id="kpi-invoice-count">0</h3>
-                            <small class="text-white-50 mt-1">${__('Documentos Validados')}</small>
-                        </div>
-                    </div>
-                    <div class="col-md-2 col-sm-6 mb-3">
-                        <div class="card p-3 border-0" style="border-radius: 10px; background: linear-gradient(135deg, #3a1c71 0%, #d76d77 50%, #ffaf7b 100%); color: #fff; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            <div class="d-flex justify-content-between align-items-center mb-2">
-                                <span class="small font-weight-bold text-uppercase">${__('Ticket Promedio')}</span>
-                                <i class="fa fa-calculator fa-lg" style="opacity: 0.7;"></i>
-                            </div>
-                            <h3 class="mb-0 font-weight-bold" id="kpi-avg-ticket">L 0.00</h3>
-                            <small class="text-white-50 mt-1">${__('Promedio por Venta')}</small>
+                            <div id="chart-pareto" style="min-height: 340px;"></div>
                         </div>
                     </div>
                 </div>
@@ -130,13 +186,13 @@ class TableroFacturasVentaApp {
                 <div class="row mb-4">
                     <div class="col-lg-8 mb-3">
                         <div class="card border-0" style="border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); background: #fff; padding: 20px;">
-                            <h5 class="card-title font-weight-bold text-dark mb-3"><i class="fa fa-area-chart text-primary mr-2"></i>${__('Tendencia de Facturación vs. Cobros')}</h5>
+                            <h5 class="card-title font-weight-bold text-dark mb-3"><i class="fa fa-area-chart mr-2" style="color: #2c3e50;"></i>${__('Tendencia de Facturación vs. Cobros')}</h5>
                             <div id="chart-sales-trend" style="min-height: 320px;"></div>
                         </div>
                     </div>
                     <div class="col-lg-4 mb-3">
                         <div class="card border-0" style="border-radius: 10px; box-shadow: 0 2px 4px rgba(0,0,0,0.03); background: #fff; padding: 20px;">
-                            <h5 class="card-title font-weight-bold text-dark mb-3"><i class="fa fa-pie-chart text-success mr-2"></i>${__('Distribución por Forma de Pago')}</h5>
+                            <h5 class="card-title font-weight-bold text-dark mb-3"><i class="fa fa-pie-chart mr-2" style="color: #7cb342;"></i>${__('Distribución por Forma de Pago')}</h5>
                             <div id="chart-payment-modes" style="min-height: 320px;"></div>
                         </div>
                     </div>
@@ -322,6 +378,7 @@ class TableroFacturasVentaApp {
             callback: function(r) {
                 if (r.message) {
                     me.render_kpis(r.message.kpis);
+                    me.render_pareto_chart(r.message.pareto_chart);
                     me.render_sales_trend_chart(r.message.trend_chart);
                     me.render_payment_modes_chart(r.message.payment_chart);
                     me.render_top_customers_chart(r.message.top_customers);
@@ -343,6 +400,41 @@ class TableroFacturasVentaApp {
         $('#kpi-avg-ticket').text(format_currency(kpis.avg_ticket, 'HNL'));
     }
 
+    render_pareto_chart(data) {
+        if (!data || !data.labels || data.labels.length === 0) {
+            $('#chart-pareto').html(`<div class="text-center text-muted p-4">${__('Sin datos de productos para análisis de Pareto')}</div>`);
+            return;
+        }
+
+        let chart_data = {
+            labels: data.labels,
+            datasets: data.datasets
+        };
+
+        if (this.charts.pareto) {
+            this.charts.pareto.update(chart_data);
+        } else {
+            this.charts.pareto = new frappe.Chart("#chart-pareto", {
+                title: "",
+                data: chart_data,
+                type: 'axis-mixed',
+                height: 330,
+                colors: ['#2c3e50', '#7cb342'],
+                axisOptions: {
+                    xIsSeries: true,
+                    shortenYAxisNumbers: 1
+                },
+                barOptions: {
+                    spaceRatio: 0.35
+                },
+                lineOptions: {
+                    dotSize: 5,
+                    regionFill: 0
+                }
+            });
+        }
+    }
+
     render_sales_trend_chart(data) {
         if (!data || !data.labels) return;
 
@@ -359,7 +451,7 @@ class TableroFacturasVentaApp {
                 data: chart_data,
                 type: 'bar',
                 height: 300,
-                colors: ['#2a5298', '#38ef7d'],
+                colors: ['#2c3e50', '#7cb342'],
                 axisOptions: {
                     xIsSeries: true
                 },
@@ -391,7 +483,7 @@ class TableroFacturasVentaApp {
                 data: chart_data,
                 type: 'percentage',
                 height: 300,
-                colors: ['#36a2eb', '#ff6384', '#4bc0c0', '#ffcd56', '#9966ff']
+                colors: ['#2c3e50', '#7cb342', '#3a506b', '#8bc34a', '#1e3a5f', '#689f38']
             });
         }
     }
@@ -417,7 +509,7 @@ class TableroFacturasVentaApp {
                 data: chart_data,
                 type: 'bar',
                 height: 280,
-                colors: ['#2193b0']
+                colors: ['#2c3e50']
             });
         }
     }
