@@ -25,6 +25,26 @@ class GenerarFactura(Document):
     def on_submit(self):
         self.create_sales_invoice()
 
+    def on_cancel(self):
+        self.cancel_sales_invoice()
+
+    def cancel_sales_invoice(self):
+        invoice_name = getattr(self, "sales_invoice", None)
+        if not invoice_name:
+            invoices = frappe.get_all(
+                "Sales Invoice",
+                filters={"invoice_generate": self.name, "docstatus": 1},
+                fields=["name"]
+            )
+            if invoices:
+                invoice_name = invoices[0].name
+
+        if invoice_name and frappe.db.exists("Sales Invoice", invoice_name):
+            si_doc = frappe.get_doc("Sales Invoice", invoice_name)
+            if si_doc.docstatus == 1:
+                si_doc.flags.ignore_permissions = True
+                si_doc.cancel()
+
     def load_pending_quota(self):
 
         if not self.financiamiento:
@@ -422,6 +442,9 @@ class GenerarFactura(Document):
         if hasattr(cuota, "name") and cuota.name:
             frappe.db.set_value("Cuota de financiamiento", cuota.name, "sales_invoice", invoice.name, update_modified=False)
 
+        self.db_set("sales_invoice", invoice.name)
+        self.sales_invoice = invoice.name
+
         # ==========================
         # ACTUALIZAR DOCUMENTO
         # ==========================
@@ -438,6 +461,7 @@ class GenerarFactura(Document):
         self.total_a_pagar = net_cuota_pendiente + flt(cuota.mora)
         self.monto_adelanto = monto_adelanto_aplicar
         self.total_facturar = invoice.grand_total or (net_cuota_a_facturar + flt(cuota.mora) + monto_adelanto_aplicar)
+        self.sales_invoice = invoice.name
 
         if es_pago_parcial:
             saldo_restante_cuota = net_cuota_pendiente - monto_recibido_val

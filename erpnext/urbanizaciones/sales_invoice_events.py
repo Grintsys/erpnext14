@@ -265,6 +265,9 @@ def process_financing_on_cancel(doc):
 		if frappe.db.exists("Generar Factura", doc.invoice_generate):
 			generar_factura = frappe.get_doc("Generar Factura", doc.invoice_generate)
 			financiamiento_name = generar_factura.financiamiento
+			if generar_factura.docstatus == 1:
+				generar_factura.flags.ignore_permissions = True
+				generar_factura.cancel()
 
 	# Identificar financiamientos afectados
 	financiamientos_afectados = set()

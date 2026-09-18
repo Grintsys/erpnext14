@@ -3,23 +3,31 @@
 
 frappe.ui.form.on('Financiamientos', {
     setup: function(frm) {
-        // Filtrar activos disponibles o reservados para la urbanización seleccionada
+        // Filtrar activos disponibles o reservados para la urbanización seleccionada en cabecera
         frm.set_query('activos', function() {
             return {
                 query: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.activo_disponible_query',
                 filters: {
-                    urbanizaciones: frm.doc.urbanizaciones || '',
+                    urbanizaciones: frm.doc.urbanizaciones || '__NONE__',
                     current_doc: frm.doc.name || ''
                 }
             };
         });
 
         // Filtrar en la tabla de múltiples activos
-        frm.set_query('activo', 'activos_detalle', function() {
+        frm.set_query('activo', 'activos_detalle', function(doc, cdt, cdn) {
+            let row = locals[cdt] && locals[cdt][cdn];
+            let urb = '';
+            if (frm.doc.multiples_urbanizaciones) {
+                urb = (row && row.urbanizacion) ? row.urbanizacion : '';
+            } else {
+                urb = frm.doc.urbanizaciones || '__NONE__';
+            }
+
             return {
                 query: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.activo_disponible_query',
                 filters: {
-                    urbanizaciones: frm.doc.urbanizaciones || '',
+                    urbanizaciones: urb,
                     current_doc: frm.doc.name || ''
                 }
             };
@@ -86,9 +94,13 @@ frappe.ui.form.on('Financiamientos', {
             // Resumen estadístico
             if (hasCuotas && frm.dashboard) {
                 frm.dashboard.clear_headline();
+                let hist_info = (frm.doc.es_saldo_inicial && frm.doc.cuotas_pagadas_historicas)
+                    ? `<span style="color: var(--primary-color, #171717);"><b>Migradas/Iniciales:</b> ${frm.doc.cuotas_pagadas_historicas}</span>`
+                    : '';
                 let summary_html = `
-                    <div style="display: flex; gap: 20px; font-size: 13px; padding: 5px 0;">
+                    <div style="display: flex; gap: 20px; font-size: 13px; padding: 5px 0; flex-wrap: wrap;">
                         <span><b>Cuotas Pagadas:</b> ${cuotasPagadas} / ${frm.doc.cuotas.length}</span>
+                        ${hist_info}
                         <span><b>Total Pagado:</b> ${format_currency(totalPagado)}</span>
                         <span><b>Saldo Pendiente:</b> ${format_currency(frm.doc.saldo_actual || 0)}</span>
                         ${totalMora > 0 ? `<span style="color: var(--text-color-danger, #e24c4c);"><b>Mora Acumulada:</b> ${format_currency(totalMora)}</span>` : ''}
@@ -205,6 +217,64 @@ frappe.ui.form.on('Financiamientos', {
                     }
                 );
             }, __('Acciones'));
+
+            frm.add_custom_button(__('Cargar Pagos Históricos'), function() {
+                let d = new frappe.ui.Dialog({
+                    title: __('Configurar Saldo Inicial / Pagos Históricos'),
+                    fields: [
+                        {
+                            label: __('Número de Cuotas Pagadas'),
+                            fieldname: 'cuotas_pagadas',
+                            fieldtype: 'Int',
+                            reqd: 1,
+                            default: frm.doc.cuotas_pagadas_historicas || 0,
+                            description: __('Total de cuotas ya pagadas en el sistema anterior (1 a ' + frm.doc.cuotas.length + ')')
+                        },
+                        {
+                            label: __('No. Recibo / Referencia Histórica'),
+                            fieldname: 'referencia',
+                            fieldtype: 'Data',
+                            default: frm.doc.referencia_migracion || '',
+                            description: __('Número de recibo, contrato o referencia del sistema heredado')
+                        },
+                        {
+                            label: __('Fecha Último Pago Histórico'),
+                            fieldname: 'fecha_corte',
+                            fieldtype: 'Date',
+                            default: frm.doc.fecha_corte_migracion || frappe.datetime.get_today()
+                        }
+                    ],
+                    primary_action_label: __('Aplicar Pagos Históricos'),
+                    primary_action: function(values) {
+                        if (values.cuotas_pagadas < 0 || values.cuotas_pagadas > frm.doc.cuotas.length) {
+                            frappe.msgprint(__('El número de cuotas debe estar entre 0 y ' + frm.doc.cuotas.length));
+                            return;
+                        }
+                        d.hide();
+                        frappe.call({
+                            method: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.aplicar_pagos_historicos',
+                            args: {
+                                docname: frm.doc.name,
+                                cuotas_pagadas: values.cuotas_pagadas,
+                                referencia: values.referencia,
+                                fecha_corte: values.fecha_corte
+                            },
+                            freeze: true,
+                            freeze_message: __('Aplicando pagos históricos...'),
+                            callback: function(r) {
+                                if (r.message && r.message.success) {
+                                    frappe.show_alert({
+                                        message: __('Se aplicaron {0} cuotas históricas correctamente.', [r.message.cuotas_pagadas]),
+                                        indicator: 'green'
+                                    });
+                                    frm.reload_doc();
+                                }
+                            }
+                        });
+                    }
+                });
+                d.show();
+            }, __('Acciones'));
         }
     },
 
@@ -214,6 +284,19 @@ frappe.ui.form.on('Financiamientos', {
             frm.set_df_property('es_refinanciamiento', 'read_only', 1);
         } else {
             frm.set_df_property('es_refinanciamiento', 'read_only', hasCuotas ? 1 : 0);
+        }
+    },
+
+    multiples_urbanizaciones: function(frm) {
+        if (!frm.doc.multiples_urbanizaciones && frm.doc.urbanizaciones) {
+            (frm.doc.activos_detalle || []).forEach(row => {
+                if (row.urbanizacion !== frm.doc.urbanizaciones) {
+                    frappe.model.set_value(row.doctype, row.name, 'urbanizacion', frm.doc.urbanizaciones);
+                }
+            });
+        }
+        if (frm.fields_dict['activos_detalle'] && frm.fields_dict['activos_detalle'].grid) {
+            frm.fields_dict['activos_detalle'].grid.refresh();
         }
     },
 
@@ -234,12 +317,27 @@ frappe.ui.form.on('Financiamientos', {
                 }
             });
         }
+        if (!frm.doc.multiples_urbanizaciones && frm.doc.urbanizaciones) {
+            (frm.doc.activos_detalle || []).forEach(row => {
+                frappe.model.set_value(row.doctype, row.name, 'urbanizacion', frm.doc.urbanizaciones);
+                if (row.activo) {
+                    frappe.db.get_value('Activos', row.activo, 'urbanizaciones', function(r) {
+                        if (r && r.urbanizaciones !== frm.doc.urbanizaciones) {
+                            frappe.model.set_value(row.doctype, row.name, 'activo', '');
+                        }
+                    });
+                }
+            });
+        }
     },
 
     activos: function(frm) {
         if (frm.doc.activos) {
-            frappe.db.get_value('Activos', frm.doc.activos, ['centro_de_costo', 'precio', 'status', 'descripcion_lote'], function(r) {
+            frappe.db.get_value('Activos', frm.doc.activos, ['centro_de_costo', 'precio', 'status', 'descripcion_lote', 'urbanizaciones'], function(r) {
                 if (r) {
+                    if (r.urbanizaciones && !frm.doc.urbanizaciones) {
+                        frm.set_value('urbanizaciones', r.urbanizaciones);
+                    }
                     if (r.centro_de_costo) {
                         frm.set_value('centro_costo', r.centro_de_costo);
                     }
@@ -292,15 +390,36 @@ frappe.ui.form.on('Financiamientos', {
 
 // Eventos de la tabla de múltiples activos
 frappe.ui.form.on('Financiamiento Activo Detalle', {
+    activos_detalle_add: function(frm, cdt, cdn) {
+        if (!frm.doc.multiples_urbanizaciones && frm.doc.urbanizaciones) {
+            frappe.model.set_value(cdt, cdn, 'urbanizacion', frm.doc.urbanizaciones);
+        }
+    },
+
+    urbanizacion: function(frm, cdt, cdn) {
+        let row = locals[cdt][cdn];
+        if (row.activo) {
+            frappe.db.get_value('Activos', row.activo, 'urbanizaciones', function(r) {
+                if (r && r.urbanizaciones && r.urbanizaciones !== row.urbanizacion) {
+                    frappe.model.set_value(cdt, cdn, 'activo', '');
+                }
+            });
+        }
+    },
+
     activo: function(frm, cdt, cdn) {
         let row = locals[cdt][cdn];
         if (row.activo) {
-            frappe.db.get_value('Activos', row.activo, ['descripcion_lote', 'precio', 'centro_de_costo', 'status'], function(r) {
+            frappe.db.get_value('Activos', row.activo, ['descripcion_lote', 'precio', 'centro_de_costo', 'status', 'urbanizaciones'], function(r) {
                 if (r) {
                     frappe.model.set_value(cdt, cdn, 'descripcion_lote', r.descripcion_lote || '');
                     frappe.model.set_value(cdt, cdn, 'precio', r.precio || 0);
                     frappe.model.set_value(cdt, cdn, 'centro_de_costo', r.centro_de_costo || '');
                     
+                    if (r.urbanizaciones) {
+                        frappe.model.set_value(cdt, cdn, 'urbanizacion', r.urbanizaciones);
+                    }
+
                     if (r.status && r.status !== 'Disponible' && r.status !== 'Reservado' && frm.is_new()) {
                         frappe.show_alert({
                             message: __('El activo {0} tiene estado {1}', [row.activo, r.status]),
@@ -308,8 +427,11 @@ frappe.ui.form.on('Financiamiento Activo Detalle', {
                         });
                     }
 
-                    // Sincronizar activos si está vacío
-                    if (!frm.doc.activos) {
+                    // Sincronizar activo principal si está vacío y coincide la urbanización
+                    if (!frm.doc.activos && (!frm.doc.urbanizaciones || frm.doc.urbanizaciones === r.urbanizaciones)) {
+                        if (!frm.doc.urbanizaciones && r.urbanizaciones) {
+                            frm.set_value('urbanizaciones', r.urbanizaciones);
+                        }
                         frm.set_value('activos', row.activo);
                     }
 

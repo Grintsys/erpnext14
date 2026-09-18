@@ -18,6 +18,7 @@
   "fecha_inicio",
   "status",
   "section_break_activos_detalle",
+  "multiples_urbanizaciones",
   "activos_detalle",
   "section_break_2",
   "configuracion_financiamiento",
@@ -31,6 +32,12 @@
   "interes_anual",
   "dia_vencimiento_cuota",
   "mora_diaria",
+  "section_break_migracion",
+  "es_saldo_inicial",
+  "cuotas_pagadas_historicas",
+  "column_break_migracion",
+  "referencia_migracion",
+  "fecha_corte_migracion",
   "section_break_3",
   "cuota_estimada",
   "saldo_actual",
@@ -99,7 +106,13 @@
    "collapsible": 1,
    "fieldname": "section_break_activos_detalle",
    "fieldtype": "Section Break",
-   "label": "Lotes / Activos Adicionales o Múltiples"
+   "label": "Lotes / Activos Adicionales o M\u00faltiples"
+  },
+  {
+   "default": "0",
+   "fieldname": "multiples_urbanizaciones",
+   "fieldtype": "Check",
+   "label": "\u00bfPermitir m\u00faltiples urbanizaciones en detalle?"
   },
   {
    "description": "Permite asociar m\u00faltiples lotes/activos a un mismo contrato de financiamiento.",
@@ -269,12 +282,47 @@
    "label": "Total financiado",
    "precision": "2",
    "read_only": 1
+  },
+  {
+   "collapsible": 1,
+   "fieldname": "section_break_migracion",
+   "fieldtype": "Section Break",
+   "label": "Migración Histórica / Saldo Inicial"
+  },
+  {
+   "default": "0",
+   "fieldname": "es_saldo_inicial",
+   "fieldtype": "Check",
+   "label": "¿Es Migración Histórica / Saldo Inicial?"
+  },
+  {
+   "default": "0",
+   "depends_on": "eval:doc.es_saldo_inicial==1",
+   "fieldname": "cuotas_pagadas_historicas",
+   "fieldtype": "Int",
+   "label": "Cuotas Pagadas Previamente"
+  },
+  {
+   "fieldname": "column_break_migracion",
+   "fieldtype": "Column Break"
+  },
+  {
+   "depends_on": "eval:doc.es_saldo_inicial==1",
+   "fieldname": "referencia_migracion",
+   "fieldtype": "Data",
+   "label": "No. Recibo / Referencia Histórica"
+  },
+  {
+   "depends_on": "eval:doc.es_saldo_inicial==1",
+   "fieldname": "fecha_corte_migracion",
+   "fieldtype": "Date",
+   "label": "Fecha Último Pago Histórico"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-08-28 16:01:39.201058",
+ "modified": "2026-09-18 11:45:30.258759",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Financiamientos",
@@ -282,6 +330,7 @@
  "owner": "Administrator",
  "permissions": [
   {
+   "cancel": 1,
    "create": 1,
    "delete": 1,
    "email": 1,
@@ -291,6 +340,7 @@
    "report": 1,
    "role": "System Manager",
    "share": 1,
+   "submit": 1,
    "write": 1
   }
  ],

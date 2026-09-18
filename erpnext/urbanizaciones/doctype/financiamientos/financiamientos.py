@@ -341,19 +341,39 @@ class Financiamientos(Document):
                 frappe.throw(_("Debe seleccionar al menos un Activo para el financiamiento."))
             return
 
+        # Validar activo principal contra la urbanización principal
+        if self.activos and self.urbanizaciones:
+            act_urb = frappe.db.get_value("Activos", self.activos, "urbanizaciones")
+            if act_urb and act_urb != self.urbanizaciones:
+                desc = frappe.db.get_value("Activos", self.activos, "descripcion_lote") or self.activos
+                frappe.throw(
+                    _("El Activo principal ({0} - {1}) no pertenece a la Urbanización seleccionada ({2}).").format(
+                        self.activos, desc, self.urbanizaciones
+                    )
+                )
+
+        # Validar activos en detalle
+        multiples_urb = bool(self.get("multiples_urbanizaciones"))
+        for row in self.get("activos_detalle") or []:
+            if not row.activo:
+                continue
+            act_urb = frappe.db.get_value("Activos", row.activo, "urbanizaciones")
+            expected_urb = row.urbanizacion if multiples_urb and row.urbanizacion else self.urbanizaciones
+
+            if expected_urb and act_urb and act_urb != expected_urb:
+                desc = frappe.db.get_value("Activos", row.activo, "descripcion_lote") or row.activo
+                frappe.throw(
+                    _("El Activo en detalle ({0} - {1}) pertenece a la urbanización '{2}', no a '{3}'.").format(
+                        row.activo, desc, act_urb, expected_urb
+                    )
+                )
+
+        # Validar si algún activo ya está financiado o vendido en otro contrato activo
         for act_name in all_activos:
             act_data = frappe.db.get_value("Activos", act_name, ["urbanizaciones", "status", "descripcion_lote"], as_dict=True)
             if not act_data:
                 continue
 
-            if self.urbanizaciones and act_data.urbanizaciones != self.urbanizaciones:
-                frappe.throw(
-                    _("El Activo ({0} - {1}) no pertenece a la Urbanización seleccionada ({2}).").format(
-                        act_name, act_data.descripcion_lote or "", self.urbanizaciones
-                    )
-                )
-
-            # Validar si el activo ya está financiado o vendido en otro contrato activo
             if act_data.status in ("Financiado", "Refinanciado", "Vendido") and self.docstatus == 0:
                 otro_fin = frappe.db.sql(
                     """
@@ -457,6 +477,10 @@ def generar_cuotas(docname):
     if is_refinancing == 'Sí':
         estado_cuota = STATUS_CUOTA[1]  # Refinanciado
 
+    es_migracion = bool(doc.get('es_saldo_inicial'))
+    cuotas_pagadas_hist = int(doc.get('cuotas_pagadas_historicas') or 0) if es_migracion else 0
+    ref_migracion = doc.get('referencia_migracion') or ''
+
     for i in range(1, n + 1):
         # calculate interest for this period
         interest = (balance * r).quantize(CENT, rounding=ROUND_HALF_UP)
@@ -487,6 +511,12 @@ def generar_cuotas(docname):
         else:
             fecha_venc = None
 
+        row_status = estado_cuota
+        row_nota = None
+        if es_migracion and i <= cuotas_pagadas_hist:
+            row_status = "Pagado"
+            row_nota = f"Pago histórico migrado de sistema anterior. Ref: {ref_migracion}".strip() if ref_migracion else "Pago histórico migrado de sistema anterior."
+
         row = {
             'doctype': child_doctype,
             'numero_cuota': i,
@@ -498,10 +528,21 @@ def generar_cuotas(docname):
             'saldo_anterior': float(prev_balance),
             'saldo': float(balance),
             'mora': 0.0,
-            'status': estado_cuota,
+            'status': row_status,
+            'notas': row_nota
         }
         doc.append(child_fieldname, row)
 
+    # Recalcular saldos y primera fecha de vencimiento
+    cuotas_list = doc.get(child_fieldname) or []
+    cuotas_pendientes = [c for c in cuotas_list if c.get('status') == 'Pendiente']
+    total_pendiente = sum(flt(c.get('total_cuota')) for c in cuotas_pendientes)
+    doc.saldo_actual = flt(total_pendiente, 2)
+
+    if cuotas_pendientes:
+        doc.fecha_vencimiento_cuota = cuotas_pendientes[0].get('fecha_vencimiento_cuota')
+    else:
+        doc.fecha_vencimiento_cuota = None
     
     # actualizar estado del financiamiento y del Activo asociado
     if estado_financiamiento == 'Borrador':
@@ -514,7 +555,10 @@ def generar_cuotas(docname):
         except Exception:
             is_ref = False
 
-        if is_ref:
+        if not cuotas_pendientes:
+            doc.status = 'Completado'
+            activo_status = 'Vendido'
+        elif is_ref:
             doc.status = 'Refinanciado'
             activo_status = 'Refinanciado'
         else:
@@ -532,6 +576,81 @@ def generar_cuotas(docname):
     # guardar y devolver
     doc.save(ignore_permissions=True)
     return {'success': True, 'rows_created': int(plazo)}
+
+
+@frappe.whitelist()
+def aplicar_pagos_historicos(docname, cuotas_pagadas, referencia=None, fecha_corte=None):
+    """
+    Aplica o actualiza pagos históricos sobre las cuotas de un financiamiento existente.
+    Permite poner al día financiamientos migrados de sistemas anteriores sin generar facturas falsas.
+    """
+    doc = frappe.get_doc("Financiamientos", docname)
+    cuotas_pagadas = int(cuotas_pagadas or 0)
+    if cuotas_pagadas < 0:
+        frappe.throw(_("El número de cuotas pagadas debe ser mayor o igual a 0."))
+
+    if not doc.cuotas:
+        frappe.throw(_("El financiamiento no tiene cuotas generadas aún."))
+
+    if cuotas_pagadas > len(doc.cuotas):
+        frappe.throw(
+            _("El número de cuotas pagadas ({0}) excede el plazo total del contrato ({1}).").format(
+                cuotas_pagadas, len(doc.cuotas)
+            )
+        )
+
+    doc.es_saldo_inicial = 1
+    doc.cuotas_pagadas_historicas = cuotas_pagadas
+    if referencia:
+        doc.referencia_migracion = referencia
+    if fecha_corte:
+        doc.fecha_corte_migracion = fecha_corte
+
+    nota_base = f"Pago histórico migrado de sistema anterior. Ref: {doc.referencia_migracion}".strip() if doc.referencia_migracion else "Pago histórico migrado de sistema anterior."
+
+    for idx, c in enumerate(doc.cuotas):
+        num = c.numero_cuota or (idx + 1)
+        if num <= cuotas_pagadas:
+            c.status = "Pagado"
+            c.sales_invoice = None
+            c.monto_adelantado = 0.0
+            if not c.notas or "Pago histórico" not in c.notas:
+                c.notas = nota_base
+        else:
+            # Si estaba marcada como histórica previamente y se redujo el conteo, volver a pendiente
+            if c.status == "Pagado" and ("Pago histórico" in (c.notas or "") or not c.sales_invoice):
+                c.status = "Pendiente"
+                c.notas = None
+
+    # Recalcular saldos y fechas
+    cuotas_pendientes = [c for c in doc.cuotas if c.status == "Pendiente"]
+    total_pendiente = sum(
+        flt(c.total_cuota) - flt(getattr(c, "monto_adelantado", 0.0))
+        for c in cuotas_pendientes
+    )
+    doc.saldo_actual = flt(total_pendiente, 2)
+
+    if cuotas_pendientes:
+        doc.fecha_vencimiento_cuota = cuotas_pendientes[0].fecha_vencimiento_cuota
+        if doc.status == "Completado":
+            is_ref = str(doc.es_refinanciamiento or "").strip().lower() in ('si', 'sí', 's', 'true', '1')
+            doc.status = "Refinanciado" if is_ref else "Activo"
+    else:
+        doc.status = "Completado"
+        doc.fecha_vencimiento_cuota = None
+        all_activos = doc.get_all_linked_activos()
+        for act_name in all_activos:
+            frappe.db.set_value("Activos", act_name, "status", "Vendido", update_modified=False)
+
+    doc.save(ignore_permissions=True)
+
+    return {
+        "success": True,
+        "cuotas_pagadas": cuotas_pagadas,
+        "saldo_actual": doc.saldo_actual,
+        "fecha_vencimiento_cuota": doc.fecha_vencimiento_cuota,
+        "status": doc.status
+    }
 
 TWOPLACES = Decimal('0.01')
 
@@ -656,16 +775,12 @@ def activo_disponible_query(doctype, txt, searchfield, start, page_len, filters)
     urbanizaciones = filters.get("urbanizaciones")
     current_doc = filters.get("current_doc")
 
-    conditions = ["(a.status IN ('Disponible', 'Reservado') OR a.status IS NULL OR a.status = '')"]
     values = {"start": int(start or 0), "page_len": int(page_len or 20)}
-
-    if urbanizaciones:
-        conditions.append("a.urbanizaciones = %(urbanizaciones)s")
-        values["urbanizaciones"] = urbanizaciones
+    conditions = []
 
     if current_doc:
-        # Permitir seleccionar los activos que ya están asociados a este financiamiento actual
-        conditions[-1] = """(
+        # Status disponible o reservado, o ya asignado a este contrato actual
+        status_cond = """(
             (a.status IN ('Disponible', 'Reservado') OR a.status IS NULL OR a.status = '')
             OR a.name IN (
                 SELECT f.activos FROM `tabFinanciamientos` f WHERE f.name = %(current_doc)s
@@ -674,6 +789,17 @@ def activo_disponible_query(doctype, txt, searchfield, start, page_len, filters)
             )
         )"""
         values["current_doc"] = current_doc
+    else:
+        status_cond = "(a.status IN ('Disponible', 'Reservado') OR a.status IS NULL OR a.status = '')"
+
+    conditions.append(status_cond)
+
+    if urbanizaciones:
+        if urbanizaciones == "__NONE__":
+            conditions.append("1=0")
+        else:
+            conditions.append("a.urbanizaciones = %(urbanizaciones)s")
+            values["urbanizaciones"] = urbanizaciones
 
     if txt:
         conditions.append("(a.name LIKE %(txt)s OR a.descripcion_lote LIKE %(txt)s)")
