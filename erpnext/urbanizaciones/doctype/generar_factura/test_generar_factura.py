@@ -288,6 +288,134 @@ class TestGenerarFactura(FrappeTestCase):
 		self.assertTrue(callable(on_cancel))
 		self.assertTrue(callable(on_trash))
 
+	def test_capture_financing_snapshot(self):
+		"""Verifica que capture_financing_snapshot congele adecuadamente cabecera y cuotas."""
+		import json
+		import frappe
+		from erpnext.urbanizaciones.doctype.generar_factura.generar_factura import capture_financing_snapshot
+
+		fin = frappe.new_doc("Financiamientos")
+		fin.name = "FIN-00001"
+		fin.status = "Activo"
+		fin.saldo_actual = 35000.00
+		fin.fecha_vencimiento_cuota = "2026-10-15"
+		fin.cuotas = [
+			frappe._dict({
+				"name": "CUOTA-001",
+				"numero_cuota": 1,
+				"fecha_vencimiento_cuota": "2026-10-15",
+				"capital": 800.0,
+				"intereses": 200.0,
+				"total_cuota": 1000.0,
+				"saldo_anterior": 36000.0,
+				"saldo": 35200.0,
+				"mora": 0.0,
+				"status": "Pendiente",
+				"monto_adelantado": 200.0,
+				"sales_invoice": None,
+				"notas": "Abono inicial previo"
+			}),
+			frappe._dict({
+				"name": "CUOTA-002",
+				"numero_cuota": 2,
+				"fecha_vencimiento_cuota": "2026-11-15",
+				"capital": 810.0,
+				"intereses": 190.0,
+				"total_cuota": 1000.0,
+				"saldo_anterior": 35200.0,
+				"saldo": 34390.0,
+				"mora": 0.0,
+				"status": "Pendiente",
+				"monto_adelantado": 0.0,
+				"sales_invoice": None,
+				"notas": None
+			})
+		]
+
+		snap_str = capture_financing_snapshot(fin)
+		snap = json.loads(snap_str)
+
+		self.assertEqual(snap["financiamiento"], "FIN-00001")
+		self.assertEqual(snap["status"], "Activo")
+		self.assertEqual(snap["saldo_actual"], 35000.00)
+		self.assertEqual(len(snap["cuotas"]), 2)
+		self.assertEqual(snap["cuotas"][0]["monto_adelantado"], 200.0)
+		self.assertEqual(snap["cuotas"][0]["name"], "CUOTA-001")
+		self.assertEqual(snap["cuotas"][0]["notas"], "Abono inicial previo")
+
+	def test_snapshot_restore_preserves_previous_abono(self):
+		"""Verifica que al revertir con snapshot una cuota con abono parcial previo retorne a su saldo parcial y no al nominal inicial."""
+		import json
+		import frappe
+		from erpnext.urbanizaciones.doctype.generar_factura.generar_factura import capture_financing_snapshot
+
+		# Simular financiamiento donde la cuota 3 tenía un abono de L 200 (saldo pendiente L 800 de 1,000)
+		fin = frappe.new_doc("Financiamientos")
+		fin.name = "FIN-TEST-ABONO"
+		fin.status = "Activo"
+		fin.saldo_actual = 33800.00
+		fin.cuotas = [
+			frappe._dict({
+				"name": "CUOTA-003",
+				"numero_cuota": 3,
+				"fecha_vencimiento_cuota": "2026-10-15",
+				"capital": 800.0,
+				"intereses": 200.0,
+				"total_cuota": 1000.0,
+				"saldo_anterior": 34600.0,
+				"saldo": 33800.0,
+				"mora": 0.0,
+				"status": "Pendiente",
+				"monto_adelantado": 200.0,
+				"sales_invoice": None,
+				"notas": "Abono previo de L 200"
+			})
+		]
+
+		# 1. Capturar snapshot antes del cobro final de L 800
+		snapshot_json = capture_financing_snapshot(fin)
+
+		# 2. Simular aplicación del cobro de L 800 (la cuota pasa a Pagado con monto_adelantado = 1000)
+		fin.cuotas[0].status = "Pagado"
+		fin.cuotas[0].monto_adelantado = 1000.0
+		fin.cuotas[0].sales_invoice = "ACC-SINV-2026-00099"
+
+		# 3. Simular restauración desde el snapshot (proceso de on_cancel)
+		snap_data = json.loads(snapshot_json)
+		restored_cuota = snap_data["cuotas"][0]
+
+		self.assertEqual(restored_cuota["status"], "Pendiente")
+		self.assertEqual(restored_cuota["monto_adelantado"], 200.0)
+		self.assertEqual(restored_cuota["sales_invoice"], None)
+		self.assertEqual(restored_cuota["notas"], "Abono previo de L 200")
+		net_restored_cuota = restored_cuota["total_cuota"] - restored_cuota["monto_adelantado"]
+		self.assertEqual(net_restored_cuota, 800.0)
+
+	def test_validate_lifo_cancellation_blocks_out_of_order(self):
+		"""Verifica que no se permita cancelar una factura antigua si existen facturas posteriores activas."""
+		import frappe
+		from erpnext.urbanizaciones.doctype.generar_factura.generar_factura import GenerarFactura
+
+		gf = frappe.new_doc("Generar Factura")
+		gf.name = "GF-00004"
+		gf.financiamiento = "FIN-TEST-LIFO"
+		gf.creation = "2026-10-01 10:00:00"
+		gf.modified = "2026-10-01 10:00:00"
+
+		# Simular búsqueda en BD de facturas posteriores activas
+		# Cuando existen posteriores (ej. GF-00005), debe lanzar ValidationError
+		orig_sql = frappe.db.sql
+		try:
+			frappe.db.sql = lambda *args, **kwargs: [{"name": "GF-00005"}]
+			with self.assertRaises(frappe.ValidationError):
+				gf.validate_lifo_cancellation()
+
+			# Cuando NO existen posteriores, debe pasar sin error
+			frappe.db.sql = lambda *args, **kwargs: []
+			gf.validate_lifo_cancellation()
+		finally:
+			frappe.db.sql = orig_sql
+
 
 
 

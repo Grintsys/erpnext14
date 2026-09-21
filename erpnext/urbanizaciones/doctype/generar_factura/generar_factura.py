@@ -1,6 +1,4 @@
-# Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
-# For license information, please see license.txt
-
+import json
 import frappe
 from frappe import _
 from frappe.model.document import Document
@@ -17,6 +15,39 @@ def get_pos_payment_amount(invoice):
     return flt(total, invoice.precision("paid_amount"))
 
 
+def capture_financing_snapshot(financiamiento_doc):
+    """
+    Captura el estado completo de un financiamiento y sus cuotas
+    antes de aplicar cualquier cobro o modificación.
+    """
+    cuotas_data = []
+    for c in financiamiento_doc.cuotas:
+        cuotas_data.append({
+            "name": c.name,
+            "numero_cuota": c.numero_cuota,
+            "fecha_vencimiento_cuota": str(c.fecha_vencimiento_cuota) if c.fecha_vencimiento_cuota else None,
+            "capital": flt(c.capital),
+            "intereses": flt(c.intereses),
+            "total_cuota": flt(c.total_cuota),
+            "saldo_anterior": flt(c.saldo_anterior),
+            "saldo": flt(c.saldo),
+            "mora": flt(c.mora),
+            "status": c.status,
+            "monto_adelantado": flt(getattr(c, "monto_adelantado", 0.0)),
+            "sales_invoice": getattr(c, "sales_invoice", None),
+            "notas": getattr(c, "notas", None)
+        })
+
+    snapshot = {
+        "financiamiento": financiamiento_doc.name,
+        "status": financiamiento_doc.status,
+        "saldo_actual": flt(financiamiento_doc.saldo_actual),
+        "fecha_vencimiento_cuota": str(financiamiento_doc.fecha_vencimiento_cuota) if financiamiento_doc.fecha_vencimiento_cuota else None,
+        "cuotas": cuotas_data
+    }
+    return json.dumps(snapshot, ensure_ascii=False)
+
+
 class GenerarFactura(Document):
 
     def validate(self):
@@ -26,7 +57,42 @@ class GenerarFactura(Document):
         self.create_sales_invoice()
 
     def on_cancel(self):
+        self.validate_lifo_cancellation()
         self.cancel_sales_invoice()
+
+    def validate_lifo_cancellation(self):
+        """
+        Valida que la cancelación se realice en orden cronológico inverso (LIFO).
+        Impide anular una factura si existen facturas posteriores activas para el mismo financiamiento.
+        """
+        if not self.financiamiento or not getattr(self, "creation", None):
+            return
+
+        later_invoices = frappe.db.sql(
+            """
+            SELECT name, creation, modified
+            FROM `tabGenerar Factura`
+            WHERE financiamiento = %s
+              AND docstatus = 1
+              AND name != %s
+              AND (creation > %s OR (creation = %s AND modified > %s) OR name > %s)
+            ORDER BY creation DESC, name DESC
+            """,
+            (self.financiamiento, self.name, self.creation, self.creation, self.modified, self.name),
+            as_dict=True
+        )
+
+        really_later = [inv for inv in later_invoices if inv["name"] != self.name]
+
+        if really_later:
+            nombres = ", ".join(f["name"] for f in really_later)
+            frappe.throw(
+                _(
+                    "No se puede cancelar la factura <b>{0}</b> porque existen facturas posteriores activas para este financiamiento: <b>{1}</b>.<br><br>"
+                    "Para preservar la integridad contable y de saldos, debe cancelar primero las facturas más recientes en orden inverso."
+                ).format(self.name, nombres),
+                title=_("Cancelación Bloqueada por Integridad")
+            )
 
     def cancel_sales_invoice(self):
         invoice_name = getattr(self, "sales_invoice", None)
@@ -41,8 +107,9 @@ class GenerarFactura(Document):
 
         if invoice_name and frappe.db.exists("Sales Invoice", invoice_name):
             si_doc = frappe.get_doc("Sales Invoice", invoice_name)
-            if si_doc.docstatus == 1:
+            if si_doc.docstatus == 1 and not getattr(si_doc.flags, "in_cancel", False):
                 si_doc.flags.ignore_permissions = True
+                si_doc.flags.in_cancel = True
                 si_doc.cancel()
 
     def load_pending_quota(self):
@@ -100,6 +167,12 @@ class GenerarFactura(Document):
             "Financiamientos",
             self.financiamiento
         )
+
+        # Capturar snapshot del estado previo del financiamiento antes de aplicar cambios
+        snapshot_json = capture_financing_snapshot(financiamiento)
+        self.estado_previo_financiamiento = snapshot_json
+        if not self.is_new():
+            self.db_set("estado_previo_financiamiento", snapshot_json, update_modified=False)
 
         # ==========================
         # CONFIGURACIÓN
@@ -454,6 +527,7 @@ class GenerarFactura(Document):
         self.db_set("monto_adelanto", monto_adelanto_aplicar)
         self.db_set("total_facturar", invoice.grand_total or (net_cuota_a_facturar + flt(cuota.mora) + monto_adelanto_aplicar))
         self.db_set("date_quote_financing", cuota.fecha_vencimiento_cuota)
+        self.db_set("estado_previo_financiamiento", snapshot_json)
 
         # Actualizar atributos en memoria para que el formulario Desk conserve los montos sin ponerse dirty/no guardado
         self.total_cuota = net_cuota_pendiente
@@ -462,6 +536,7 @@ class GenerarFactura(Document):
         self.monto_adelanto = monto_adelanto_aplicar
         self.total_facturar = invoice.grand_total or (net_cuota_a_facturar + flt(cuota.mora) + monto_adelanto_aplicar)
         self.sales_invoice = invoice.name
+        self.estado_previo_financiamiento = snapshot_json
 
         if es_pago_parcial:
             saldo_restante_cuota = net_cuota_pendiente - monto_recibido_val

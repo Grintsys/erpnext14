@@ -1,6 +1,7 @@
 # Copyright (c) 2026, Frappe Technologies Pvt. Ltd. and contributors
 # For license information, please see license.txt
 
+import json
 import frappe
 from frappe import _
 from frappe.utils import getdate, flt, cstr
@@ -250,125 +251,175 @@ def process_financing_on_submit(doc):
 def process_financing_on_cancel(doc):
 	"""
 	Reversión automática al anular una Sales Invoice.
+	Utiliza el snapshot pre-transaccional de Generar Factura si existe para
+	restaurar de forma atómica y fidedigna las cuotas y saldos sin reamortizaciones destructivas.
 	"""
-	# 1. Buscar todas las cuotas asociadas directamente a esta factura
-	cuotas_directas = frappe.get_all(
-		"Cuota de financiamiento",
-		filters={"sales_invoice": doc.name},
-		fields=["name", "parent", "status", "total_cuota", "monto_adelantado", "numero_cuota", "notas"]
-	)
-
-	# 2. Si tiene doc.invoice_generate
+	# 1. Obtener Generar Factura vinculada
 	generar_factura = None
 	financiamiento_name = None
 	if doc.get("invoice_generate"):
 		if frappe.db.exists("Generar Factura", doc.invoice_generate):
 			generar_factura = frappe.get_doc("Generar Factura", doc.invoice_generate)
 			financiamiento_name = generar_factura.financiamiento
-			if generar_factura.docstatus == 1:
+			if hasattr(generar_factura, "validate_lifo_cancellation"):
+				generar_factura.validate_lifo_cancellation()
+			if generar_factura.docstatus == 1 and not getattr(generar_factura.flags, "in_cancel", False):
 				generar_factura.flags.ignore_permissions = True
+				generar_factura.flags.in_cancel = True
 				generar_factura.cancel()
 
-	# Identificar financiamientos afectados
-	financiamientos_afectados = set()
-	if financiamiento_name:
-		financiamientos_afectados.add(financiamiento_name)
-	for c in cuotas_directas:
-		if c.parent:
-			financiamientos_afectados.add(c.parent)
+	# 2. Si existe un snapshot pre-transaccional en Generar Factura, restaurar desde snapshot
+	snapshot_restaurado = False
+	if generar_factura and getattr(generar_factura, "estado_previo_financiamiento", None):
+		try:
+			snap_data = json.loads(generar_factura.estado_previo_financiamiento)
+			fin_name = snap_data.get("financiamiento") or financiamiento_name
+			if fin_name and frappe.db.exists("Financiamientos", fin_name):
+				fin_doc = frappe.get_doc("Financiamientos", fin_name)
 
-	# Revertir cuotas directas
-	for c in cuotas_directas:
-		nota_cancel = f"[Factura {doc.name} CANCELADA] Pago revertido."
-		nota_existente = cstr(c.notas).strip()
-		nueva_nota = f"{nota_existente}\n{nota_cancel}".strip() if nota_existente else nota_cancel
+				# Restaurar cada cuota guardada en el snapshot
+				for c_snap in snap_data.get("cuotas", []):
+					c_name = c_snap.get("name")
+					if c_name and frappe.db.exists("Cuota de financiamiento", c_name):
+						update_dict = {
+							"status": c_snap.get("status", "Pendiente"),
+							"saldo_anterior": flt(c_snap.get("saldo_anterior", 0.0)),
+							"capital": flt(c_snap.get("capital", 0.0)),
+							"intereses": flt(c_snap.get("intereses", 0.0)),
+							"total_cuota": flt(c_snap.get("total_cuota", 0.0)),
+							"saldo": flt(c_snap.get("saldo", 0.0)),
+							"monto_adelantado": flt(c_snap.get("monto_adelantado", 0.0)),
+							"sales_invoice": c_snap.get("sales_invoice"),
+							"mora": flt(c_snap.get("mora", 0.0)),
+							"notas": c_snap.get("notas")
+						}
+						if c_snap.get("fecha_vencimiento_cuota"):
+							update_dict["fecha_vencimiento_cuota"] = c_snap.get("fecha_vencimiento_cuota")
+						frappe.db.set_value("Cuota de financiamiento", c_name, update_dict, update_modified=False)
 
-		frappe.db.set_value(
+				# Restaurar cabecera del financiamiento
+				fin_update = {
+					"saldo_actual": flt(snap_data.get("saldo_actual", 0.0)),
+					"status": snap_data.get("status", "Activo")
+				}
+				if snap_data.get("fecha_vencimiento_cuota"):
+					fin_update["fecha_vencimiento_cuota"] = snap_data.get("fecha_vencimiento_cuota")
+
+				# Asegurar que el status no sea 'Completado' o 'Cancelado' si debe estar activo
+				if fin_update["status"] in ("Completado", "Cancelado") and fin_update["saldo_actual"] > 0:
+					is_ref = str(fin_doc.es_refinanciamiento or "").strip().lower() in ('si', 'sí', 's', 'true', '1')
+					fin_update["status"] = "Refinanciado" if is_ref else "Activo"
+
+				frappe.db.set_value("Financiamientos", fin_name, fin_update, update_modified=False)
+
+				# Restaurar estado de activos si estaban como Vendido
+				is_ref = str(fin_doc.es_refinanciamiento or "").strip().lower() in ('si', 'sí', 's', 'true', '1')
+				all_activos = fin_doc.get_all_linked_activos() if hasattr(fin_doc, "get_all_linked_activos") else ([fin_doc.activos] if getattr(fin_doc, "activos", None) else [])
+				for act_name in all_activos:
+					cur_act_status = frappe.db.get_value("Activos", act_name, "status")
+					if cur_act_status == "Vendido":
+						frappe.db.set_value(
+							"Activos",
+							act_name,
+							"status",
+							"Refinanciado" if is_ref else "Financiado",
+							update_modified=False
+						)
+
+				snapshot_restaurado = True
+		except Exception as e:
+			frappe.log_error(frappe.get_traceback(), f"process_financing_on_cancel snapshot restore error: {str(e)}")
+			snapshot_restaurado = False
+
+	# 3. Fallback para documentos sin snapshot (legados)
+	if not snapshot_restaurado:
+		cuotas_directas = frappe.get_all(
 			"Cuota de financiamiento",
-			c.name,
-			{
-				"status": "Pendiente",
-				"sales_invoice": None,
-				"notas": nueva_nota
-			},
-			update_modified=False
+			filters={"sales_invoice": doc.name},
+			fields=["name", "parent", "status", "total_cuota", "monto_adelantado", "numero_cuota", "notas"]
 		)
+		financiamientos_afectados = set()
+		if financiamiento_name:
+			financiamientos_afectados.add(financiamiento_name)
+		for c in cuotas_directas:
+			if c.parent:
+				financiamientos_afectados.add(c.parent)
 
-	# Si hay Generar Factura, verificar abonos parciales o adelantos multi-cuota
-	if generar_factura and financiamiento_name:
-		fin_doc = frappe.get_doc("Financiamientos", financiamiento_name)
-		monto_recibido_gf = flt(getattr(generar_factura, "monto_recibido", 0.0))
-		net_cuota_pendiente = flt(generar_factura.total_cuota)
-		total_a_pagar_esperado = net_cuota_pendiente + flt(generar_factura.total_mora)
-		es_pago_parcial = (monto_recibido_gf > 0) and (monto_recibido_gf < total_a_pagar_esperado)
+		for c in cuotas_directas:
+			nota_cancel = f"[Factura {doc.name} CANCELADA] Pago revertido."
+			nota_existente = cstr(c.notas).strip()
+			nueva_nota = f"{nota_existente}\n{nota_cancel}".strip() if nota_existente else nota_cancel
 
-		for cuota in fin_doc.cuotas:
-			if doc.name in (cuota.notas or ""):
-				if es_pago_parcial and getdate(cuota.fecha_vencimiento_cuota) == getdate(generar_factura.date_quote_financing):
-					prev_adelantado = flt(getattr(cuota, "monto_adelantado", 0.0))
-					nuevo_adelantado = max(0.0, prev_adelantado - monto_recibido_gf)
-					frappe.db.set_value(
-						"Cuota de financiamiento",
-						cuota.name,
-						{
-							"monto_adelantado": nuevo_adelantado,
-							"status": "Pendiente",
-							"sales_invoice": None
-						},
-						update_modified=False
-					)
-				elif not es_pago_parcial and cuota.numero_cuota > 1:
-					if cuota.status in ("Pagado", "Pendiente") and (cuota.sales_invoice == doc.name or doc.name in (cuota.notas or "")):
+			frappe.db.set_value(
+				"Cuota de financiamiento",
+				c.name,
+				{
+					"status": "Pendiente",
+					"sales_invoice": None,
+					"notas": nueva_nota
+				},
+				update_modified=False
+			)
+
+		if generar_factura and financiamiento_name:
+			fin_doc = frappe.get_doc("Financiamientos", financiamiento_name)
+			monto_recibido_gf = flt(getattr(generar_factura, "monto_recibido", 0.0))
+			net_cuota_pendiente = flt(generar_factura.total_cuota)
+			total_a_pagar_esperado = net_cuota_pendiente + flt(generar_factura.total_mora)
+			es_pago_parcial = (monto_recibido_gf > 0) and (monto_recibido_gf < total_a_pagar_esperado)
+
+			for cuota in fin_doc.cuotas:
+				if doc.name in (cuota.notas or ""):
+					if es_pago_parcial and getdate(cuota.fecha_vencimiento_cuota) == getdate(generar_factura.date_quote_financing):
+						prev_adelantado = flt(getattr(cuota, "monto_adelantado", 0.0))
+						nuevo_adelantado = max(0.0, prev_adelantado - monto_recibido_gf)
 						frappe.db.set_value(
 							"Cuota de financiamiento",
 							cuota.name,
 							{
+								"monto_adelantado": nuevo_adelantado,
 								"status": "Pendiente",
-								"sales_invoice": None,
-								"monto_adelantado": 0.0
+								"sales_invoice": None
 							},
 							update_modified=False
 						)
+					elif not es_pago_parcial and cuota.numero_cuota > 1:
+						if cuota.status in ("Pagado", "Pendiente") and (cuota.sales_invoice == doc.name or doc.name in (cuota.notas or "")):
+							frappe.db.set_value(
+								"Cuota de financiamiento",
+								cuota.name,
+								{
+									"status": "Pendiente",
+									"sales_invoice": None,
+									"monto_adelantado": 0.0
+								},
+								update_modified=False
+							)
 
-	# Recalcular saldos, estados y fechas en los financiamientos afectados
-	for fin_name in financiamientos_afectados:
-		fin = frappe.get_doc("Financiamientos", fin_name)
-		total_pendiente = sum(
-			(flt(c.total_cuota) - flt(getattr(c, "monto_adelantado", 0.0)))
-			for c in fin.cuotas
-			if c.status == "Pendiente"
-		)
-		siguiente_fecha = None
-		for c in fin.cuotas:
-			if c.status == "Pendiente":
-				siguiente_fecha = c.fecha_vencimiento_cuota
-				break
+		for fin_name in financiamientos_afectados:
+			fin = frappe.get_doc("Financiamientos", fin_name)
+			if hasattr(fin, "recalcular_amortizacion_completa"):
+				fin.recalcular_amortizacion_completa()
 
-		update_fin = {
-			"saldo_actual": flt(total_pendiente, 2),
-			"fecha_vencimiento_cuota": siguiente_fecha
-		}
+			if fin.status == "Completado":
+				is_ref = str(fin.es_refinanciamiento or "").strip().lower() in ('si', 'sí', 's', 'true', '1')
+				new_status = "Refinanciado" if is_ref else "Activo"
+				frappe.db.set_value("Financiamientos", fin.name, "status", new_status, update_modified=False)
 
-		if fin.status == "Completado":
-			is_ref = str(fin.es_refinanciamiento or "").strip().lower() in ('si', 'sí', 's', 'true', '1')
-			update_fin["status"] = "Refinanciado" if is_ref else "Activo"
-
-			all_activos = fin.get_all_linked_activos() if hasattr(fin, "get_all_linked_activos") else ([fin.activos] if getattr(fin, "activos", None) else [])
-			for act_name in all_activos:
-				frappe.db.set_value(
-					"Activos",
-					act_name,
-					"status",
-					"Financiado" if not is_ref else "Refinanciado",
-					update_modified=False
-				)
-
-		frappe.db.set_value("Financiamientos", fin.name, update_fin, update_modified=False)
+				all_activos = fin.get_all_linked_activos() if hasattr(fin, "get_all_linked_activos") else ([fin.activos] if getattr(fin, "activos", None) else [])
+				for act_name in all_activos:
+					frappe.db.set_value(
+						"Activos",
+						act_name,
+						"status",
+						"Financiado" if not is_ref else "Refinanciado",
+						update_modified=False
+					)
 
 	frappe.msgprint(
 		_(
 			"Se ha cancelado la factura <b>{0}</b>.<br>"
-			"Las cuotas vinculadas han regresado a estado <b>Pendiente</b> y el saldo del financiamiento fue restaurado."
+			"Las cuotas vinculadas han regresado a su estado previo y el saldo del financiamiento fue restaurado de forma íntegra."
 		).format(doc.name),
 		title=_("Reversión de Facturación Exitosa")
 	)

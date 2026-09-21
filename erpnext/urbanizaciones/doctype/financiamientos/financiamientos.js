@@ -108,6 +108,13 @@ frappe.ui.form.on('Financiamientos', {
                 `;
                 frm.dashboard.set_headline(summary_html);
             }
+
+            // Ocultar opción estándar de cancelar de Frappe (la cancelación de contrato se hace vía Cancelar Financiamiento)
+            setTimeout(() => {
+                if (frm.page && frm.page.menu) {
+                    frm.page.menu.find('[data-label="Cancel"], [data-label="Cancelar"]').hide();
+                }
+            }, 100);
         }
 
         // Mostrar botón 'Generar cuotas' mientras el documento esté en Borrador (docstatus == 0)

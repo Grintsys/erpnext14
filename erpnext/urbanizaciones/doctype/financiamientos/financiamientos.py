@@ -315,6 +315,93 @@ class Financiamientos(Document):
             if self.docstatus == 0:
                 self.save(ignore_permissions=True)
 
+    def recalcular_amortizacion_completa(self):
+        """
+        Recalcula y restaura la tabla de amortización para todas las cuotas no pagadas
+        (por ejemplo, tras la anulación de una factura con abonos extraordinarios a capital/intereses).
+        Restaura cuotas que fueron llevadas a cero o estado 'Anticipada'.
+        """
+        from decimal import Decimal, getcontext, ROUND_HALF_UP
+
+        getcontext().prec = 28
+        CENT = Decimal('0.01')
+
+        # Recargar cuotas desde base de datos
+        self.reload()
+        if not self.cuotas:
+            return
+
+        capital_total = Decimal(str(self.capital_financiado or 0))
+        annual_interest = Decimal(str(self.interes_anual or 0))
+        plazo_total = int(self.plazo_meses or len(self.cuotas))
+
+        r = (annual_interest / Decimal('100')) / Decimal('12') if annual_interest != 0 else Decimal('0')
+
+        if plazo_total > 0 and capital_total > 0:
+            if r == 0:
+                original_pmt = (capital_total / plazo_total).quantize(CENT, rounding=ROUND_HALF_UP)
+            else:
+                original_pmt = (r * capital_total / (Decimal('1') - (Decimal('1') + r) ** (Decimal(-plazo_total)))).quantize(CENT, rounding=ROUND_HALF_UP)
+        else:
+            original_pmt = Decimal('0.00')
+
+        sorted_cuotas = sorted(self.cuotas, key=lambda x: int(x.numero_cuota or 0))
+
+        balance = capital_total
+        for idx, c in enumerate(sorted_cuotas):
+            if c.status == "Pagado":
+                balance = Decimal(str(c.saldo or 0))
+                continue
+
+            interest = (balance * r).quantize(CENT, rounding=ROUND_HALF_UP)
+            principal = (original_pmt - interest).quantize(CENT, rounding=ROUND_HALF_UP)
+
+            if idx == len(sorted_cuotas) - 1 or principal >= balance:
+                principal = balance
+                this_payment = (principal + interest).quantize(CENT, rounding=ROUND_HALF_UP)
+                prev_b = balance
+                balance = Decimal('0.00')
+            else:
+                this_payment = original_pmt
+                prev_b = balance
+                balance = (balance - principal).quantize(CENT, rounding=ROUND_HALF_UP)
+                if balance < 0:
+                    balance = Decimal('0.00')
+
+            c.status = "Pendiente"
+            c.saldo_anterior = float(prev_b)
+            c.intereses = float(interest)
+            c.capital = float(principal)
+            c.total_cuota = float(this_payment)
+            c.saldo = float(balance)
+            c.sales_invoice = None
+            c.monto_adelantado = 0.0
+
+            if getattr(c, "name", None):
+                frappe.db.set_value("Cuota de financiamiento", c.name, {
+                    "status": "Pendiente",
+                    "saldo_anterior": c.saldo_anterior,
+                    "intereses": c.intereses,
+                    "capital": c.capital,
+                    "total_cuota": c.total_cuota,
+                    "saldo": c.saldo,
+                    "sales_invoice": None,
+                    "monto_adelantado": 0.0,
+                    "notas": getattr(c, "notas", "")
+                }, update_modified=False)
+
+        # Recalcular saldos del financiamiento
+        total_futuro = sum(flt(c.total_cuota) for c in sorted_cuotas if c.status == "Pendiente")
+        self.saldo_actual = flt(total_futuro, 2)
+
+        pendientes = [c for c in sorted_cuotas if c.status == "Pendiente"]
+        self.fecha_vencimiento_cuota = pendientes[0].fecha_vencimiento_cuota if pendientes else None
+
+        frappe.db.set_value("Financiamientos", self.name, {
+            "saldo_actual": self.saldo_actual,
+            "fecha_vencimiento_cuota": self.fecha_vencimiento_cuota
+        }, update_modified=False)
+
 
     def calculate_financial_totals(self):
         if self.is_new() or not self.get("cuotas"):
@@ -651,6 +738,17 @@ def aplicar_pagos_historicos(docname, cuotas_pagadas, referencia=None, fecha_cor
         "fecha_vencimiento_cuota": doc.fecha_vencimiento_cuota,
         "status": doc.status
     }
+
+
+@frappe.whitelist()
+def recalcular_amortizacion_fin(docname):
+    """
+    Restaura y recalcula la tabla de amortización de un financiamiento a sus valores estándar.
+    """
+    doc = frappe.get_doc("Financiamientos", docname)
+    doc.recalcular_amortizacion_completa()
+    return {"success": True, "saldo_actual": doc.saldo_actual}
+
 
 TWOPLACES = Decimal('0.01')
 

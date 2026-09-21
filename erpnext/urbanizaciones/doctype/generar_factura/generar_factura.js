@@ -24,6 +24,31 @@ frappe.ui.form.on('Generar Factura', {
         } else {
             calculate_payment_totals(frm);
         }
+
+        if (frm.doc.docstatus === 1) {
+            frm.savecancel = function() {
+                frappe.confirm(
+                    __('¿Está seguro de que desea cancelar esta factura ({0})?<br><br>Se anulará únicamente esta factura y su factura de venta vinculada, restaurando las cuotas a su estado anterior en el financiamiento.', [frm.doc.name]),
+                    function() {
+                        frappe.call({
+                            method: 'frappe.client.cancel',
+                            args: {
+                                doctype: frm.doc.doctype,
+                                name: frm.doc.name
+                            },
+                            freeze: true,
+                            freeze_message: __('Cancelando factura y revirtiendo cuotas...'),
+                            callback: function(r) {
+                                if (!r.exc) {
+                                    frm.reload_doc();
+                                }
+                            }
+                        });
+                    }
+                );
+            };
+            frm.page.set_secondary_action(__('Cancel'), () => frm.savecancel());
+        }
     },
     onload: function(frm) {
         setup_financiamiento_query(frm);
