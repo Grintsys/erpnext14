@@ -10,6 +10,7 @@ def execute(filters=None):
         {"fieldname": "warehouse", "fieldtype": "Link", "options": "Warehouse", "label": "Almacen", "width": 140},
         {"fieldname": "type_document", "fieldtype": "Data", "label": "Tipo de documento", "width": 140},
         {"fieldname": "total_exempt", "fieldtype": "Currency", "label": "Total Exento", "width": 110},
+        {"fieldname": "total_exonerated", "fieldtype": "Currency", "label": "Total Exonerado", "width": 110},
         {"fieldname": "base_isv_15%", "fieldtype": "Currency", "label": "Base ISV 15%", "width": 110},
         {"fieldname": "isv_15%", "fieldtype": "Currency", "label": "ISV 15%", "width": 110},
         {"fieldname": "base_isv_18%", "fieldtype": "Currency", "label": "Base ISV 18%", "width": 110},
@@ -58,6 +59,7 @@ def execute(filters=None):
             pp.warehouse                              AS warehouse,
             si.is_return                               AS is_return,
             SUM(si.exempt_amount)                      AS total_exempt,
+            SUM(si.exonerated_amount)                  AS total_exonerated,
             SUM(si.taxed_amount_15)                    AS base_isv_15,
             SUM(si.isv_15)                             AS isv_15,
             SUM(si.taxed_amount_18)                    AS base_isv_18,
@@ -84,6 +86,7 @@ def execute(filters=None):
         type_document = "Devolución" if flt(r.is_return) == 1 else "Factura de venta"
 
         total_exempt = flt(r.total_exempt)
+        total_exonerated = flt(r.total_exonerated)
         base_isv_15 = flt(r.base_isv_15)
         isv_15 = flt(r.isv_15)
         base_isv_18 = flt(r.base_isv_18)
@@ -94,7 +97,7 @@ def execute(filters=None):
         cost = flt(r.cost)
 
         # Monto bruto SIN impuestos
-        gross_amount = total_exempt + base_isv_15 + base_isv_18 - discount_amount
+        gross_amount = total_exempt + total_exonerated + base_isv_15 + base_isv_18 - discount_amount
 
         # Utilidad / % Utilidad
         utility = gross_amount - cost
@@ -109,6 +112,7 @@ def execute(filters=None):
             warehouse,
             type_document,
             total_exempt,
+            total_exonerated,
             base_isv_15,
             isv_15,
             base_isv_18,

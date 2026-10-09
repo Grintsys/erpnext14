@@ -9,6 +9,9 @@ function setup_financiamiento_query(frm) {
         if (frm.doc.customer) {
             filters.customer = frm.doc.customer;
         }
+        if (frm.doc.company) {
+            filters.company = frm.doc.company;
+        }
         return {
             query: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.financiamiento_query',
             filters: filters
@@ -17,6 +20,9 @@ function setup_financiamiento_query(frm) {
 }
 
 frappe.ui.form.on('Generar Factura', {
+    setup: function(frm) {
+        frm.set_df_property('conversion_rate', 'read_only', 1);
+    },
     refresh: function(frm) {
         setup_financiamiento_query(frm);
         if (frm.doc.docstatus === 0 && frm.doc.financiamiento && !frm.doc.total_a_pagar) {
@@ -61,11 +67,41 @@ frappe.ui.form.on('Generar Factura', {
             fetch_pending_quota(frm);
         } else {
             frm.set_value('date_quote_financing', null);
+            frm.set_value('total_cuota_financiamiento', 0);
+            frm.set_value('total_mora_financiamiento', 0);
+            frm.set_value('total_a_pagar_financiamiento', 0);
             frm.set_value('total_cuota', 0);
             frm.set_value('total_mora', 0);
             frm.set_value('total_a_pagar', 0);
             calculate_payment_totals(frm);
         }
+    },
+    pos_profile: function(frm) {
+        if (frm.doc.pos_profile) {
+            frappe.db.get_value('POS Profile', frm.doc.pos_profile, ['currency', 'company'], function(r) {
+                if (r) {
+                    if (r.currency) {
+                        frm.set_value('currency', r.currency);
+                    }
+                    if (r.company && !frm.doc.company) {
+                        frm.set_value('company', r.company);
+                    }
+                }
+                if (frm.doc.financiamiento) {
+                    fetch_pending_quota(frm);
+                }
+            });
+        }
+    },
+    conversion_rate: function(frm) {
+        let rate = flt(frm.doc.conversion_rate) || 1.0;
+        let cuota_finan = flt(frm.doc.total_cuota_financiamiento);
+        let mora_finan = flt(frm.doc.total_mora_financiamiento);
+
+        frm.set_value('total_cuota', flt(cuota_finan * rate, 2));
+        frm.set_value('total_mora', flt(mora_finan * rate, 2));
+        frm.set_value('total_a_pagar', flt((cuota_finan + mora_finan) * rate, 2));
+        calculate_payment_totals(frm);
     },
     total_cuota: function(frm) {
         calculate_payment_totals(frm);
@@ -96,17 +132,30 @@ function fetch_pending_quota(frm) {
     frappe.call({
         method: 'erpnext.urbanizaciones.doctype.generar_factura.generar_factura.get_pending_quota_details',
         args: {
-            financiamiento: frm.doc.financiamiento
+            financiamiento: frm.doc.financiamiento,
+            pos_profile: frm.doc.pos_profile || ''
         },
         callback: function(r) {
             if (r.message && Object.keys(r.message).length > 0) {
-                if (!frm.doc.customer && r.message.customer) {
-                    frm.set_value('customer', r.message.customer);
+                let data = r.message;
+                if (!frm.doc.customer && data.customer) {
+                    frm.set_value('customer', data.customer);
                 }
-                frm.set_value('date_quote_financing', r.message.date_quote_financing);
-                frm.set_value('total_cuota', r.message.total_cuota);
-                frm.set_value('total_mora', r.message.total_mora);
-                frm.set_value('total_a_pagar', r.message.total_a_pagar);
+                if (data.company && !frm.doc.company) {
+                    frm.set_value('company', data.company);
+                }
+                frm.set_value('currency_financiamiento', data.currency_financiamiento || 'USD');
+                if (data.currency) {
+                    frm.set_value('currency', data.currency);
+                }
+                frm.set_value('conversion_rate', data.conversion_rate || 1.0);
+                frm.set_value('date_quote_financing', data.date_quote_financing);
+                frm.set_value('total_cuota_financiamiento', data.total_cuota_financiamiento);
+                frm.set_value('total_mora_financiamiento', data.total_mora_financiamiento);
+                frm.set_value('total_a_pagar_financiamiento', data.total_a_pagar_financiamiento);
+                frm.set_value('total_cuota', data.total_cuota);
+                frm.set_value('total_mora', data.total_mora);
+                frm.set_value('total_a_pagar', data.total_a_pagar);
             }
             calculate_payment_totals(frm);
         }
@@ -173,4 +222,3 @@ function calculate_payment_totals(frm) {
     let total_facturar = (monto_recibido > 0) ? (total_a_pagar + monto_adelanto) : total_a_pagar;
     frm.set_value('total_facturar', total_facturar);
 }
-

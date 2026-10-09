@@ -6,6 +6,13 @@ from frappe import _
 from frappe.model.document import Document
 
 class CancelarFinanciamiento(Document):
+	def validate(self):
+		if not self.company:
+			if self.financiamientos:
+				self.company = frappe.db.get_value("Financiamientos", self.financiamientos, "company")
+			if not self.company:
+				self.company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+
 	def before_save(self):
 		"""
 		Validate that linked Financiamientos is 'Activo' before allowing save.

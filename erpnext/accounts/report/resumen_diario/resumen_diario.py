@@ -20,6 +20,7 @@ def get_columns():
         _("Rango") + "::180",                # ######## - ######## (8 dígitos)
         _("Facturas") + ":Int:80",
         _("Ventas exentas") + ":Currency:120",
+        _("Ventas exoneradas") + ":Currency:120",
         _("Base 15%") + ":Currency:140",
         _("I.S.V 15%") + ":Currency:110",
         _("Base 18%") + ":Currency:140",
@@ -59,6 +60,7 @@ def get_data(filters):
             si.posting_date,
             COALESCE(si.is_return, 0) AS is_return,
             si.exempt_amount,
+            si.exonerated_amount,
             si.taxed_amount_15,
             si.isv_15,
             si.taxed_amount_18,
@@ -86,6 +88,7 @@ def get_data(filters):
             {
                 "count": 0,
                 "exempt": 0.0,
+                "exonerated": 0.0,
                 "taxed15": 0.0,
                 "isv15": 0.0,
                 "taxed18": 0.0,
@@ -99,6 +102,7 @@ def get_data(filters):
         )
         g["count"] += 1
         g["exempt"] += flt(r.get("exempt_amount"))
+        g["exonerated"] += flt(r.get("exonerated_amount"))
         g["taxed15"] += flt(r.get("taxed_amount_15"))
         g["isv15"] += flt(r.get("isv_15"))
         g["taxed18"] += flt(r.get("taxed_amount_18"))
@@ -122,6 +126,7 @@ def get_data(filters):
             {
                 "count": 0,
                 "exempt": 0.0,
+                "exonerated": 0.0,
                 "taxed15": 0.0,
                 "isv15": 0.0,
                 "taxed18": 0.0,
@@ -139,13 +144,14 @@ def get_data(filters):
         if g["count"] > 0 and g["min_no"] is not None and g["max_no"] is not None:
             rango = format_range(g["min_no"], g["max_no"])
 
-        monto_bruto = flt(g["exempt"]) + flt(g["taxed15"]) + flt(g["taxed18"]) - flt(g["discount"])
+        monto_bruto = flt(g["exempt"]) + flt(g["exonerated"]) + flt(g["taxed15"]) + flt(g["taxed18"]) - flt(g["discount"])
 
         out.append([
             cur,
             rango,
             g["count"],
             g["exempt"],
+            g["exonerated"],
             g["taxed15"],
             g["isv15"],
             g["taxed18"],

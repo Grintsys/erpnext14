@@ -1002,6 +1002,7 @@ var consolidate_honduras_totals = function(frm) {
 	let taxed_amount_18 = 0.0;
 	let isv_18 = 0.0;
 	let exempt_amount = 0.0;
+	let exonerated_amount = 0.0;
 
 	let item_tax_rates = {};
 	let item_tax_amounts = {};
@@ -1036,6 +1037,8 @@ var consolidate_honduras_totals = function(frm) {
 		});
 	});
 
+	let is_exonerated_party = (doc.tax_category === "Exonerado" || doc.tax_category === "EXONERADO");
+
 	(doc.items || []).forEach(function(item) {
 		let key = item.name || item.item_code;
 		let net_amt = flt(item.net_amount);
@@ -1058,7 +1061,9 @@ var consolidate_honduras_totals = function(frm) {
 			});
 		}
 
-		if (Math.abs(rate - 15.0) < 0.01) {
+		if (is_exonerated_party) {
+			exonerated_amount += net_amt;
+		} else if (Math.abs(rate - 15.0) < 0.01) {
 			taxed_amount_15 += net_amt;
 			let tax_amt = (item_tax_amounts[key] && item_tax_amounts[key][15.0] !== undefined)
 				? item_tax_amounts[key][15.0]
@@ -1078,18 +1083,21 @@ var consolidate_honduras_totals = function(frm) {
 	let p15 = precision("taxed_amount_15", doc) || 2;
 	let p18 = precision("taxed_amount_18", doc) || 2;
 	let p_ex = precision("exempt_amount", doc) || 2;
+	let p_exo = precision("exonerated_amount", doc) || 2;
 
 	frm.set_value("taxed_amount_15", flt(taxed_amount_15, p15), null, true);
 	frm.set_value("isv_15", flt(isv_15, p15), null, true);
 	frm.set_value("taxed_amount_18", flt(taxed_amount_18, p18), null, true);
 	frm.set_value("isv_18", flt(isv_18, p18), null, true);
 	frm.set_value("exempt_amount", flt(exempt_amount, p_ex), null, true);
+	frm.set_value("exonerated_amount", flt(exonerated_amount, p_exo), null, true);
 
 	frm.refresh_field("taxed_amount_15");
 	frm.refresh_field("isv_15");
 	frm.refresh_field("taxed_amount_18");
 	frm.refresh_field("isv_18");
 	frm.refresh_field("exempt_amount");
+	frm.refresh_field("exonerated_amount");
 };
 
 

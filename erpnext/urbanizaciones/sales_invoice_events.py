@@ -47,57 +47,77 @@ def process_financing_on_submit(doc):
 	financiamiento = frappe.get_doc("Financiamientos", generar_factura.financiamiento)
 	fecha_cuota = getdate(generar_factura.date_quote_financing)
 
+	conversion_rate = flt(getattr(generar_factura, "conversion_rate", 1.0)) or 1.0
+	fin_currency = getattr(financiamiento, "currency", None) or "USD"
+	invoice_currency = getattr(doc, "currency", None) or getattr(generar_factura, "currency", None) or "HNL"
+
 	cuota_encontrada = False
 
 	for index, cuota in enumerate(financiamiento.cuotas):
 		if getdate(cuota.fecha_vencimiento_cuota) == fecha_cuota and cuota.status == "Pendiente":
-			net_cuota_pendiente = flt(cuota.total_cuota) - flt(getattr(cuota, "monto_adelantado", 0.0))
-			if net_cuota_pendiente < 0:
-				net_cuota_pendiente = 0.0
+			# Montos en moneda de financiamiento (ej. USD)
+			net_cuota_pendiente_finan = flt(cuota.total_cuota) - flt(getattr(cuota, "monto_adelantado", 0.0))
+			if net_cuota_pendiente_finan < 0:
+				net_cuota_pendiente_finan = 0.0
+
+			mora_finan = flt(cuota.mora)
+			total_a_pagar_finan = net_cuota_pendiente_finan + mora_finan
+
+			# Montos convertidos a la moneda de la factura (ej. HNL)
+			net_cuota_factura = round(net_cuota_pendiente_finan * conversion_rate, 2)
+			mora_factura = round(mora_finan * conversion_rate, 2)
+			total_a_pagar_esperado_factura = round(net_cuota_factura + mora_factura, 2)
 
 			monto_recibido_gf = flt(getattr(generar_factura, "monto_recibido", 0.0))
-			total_a_pagar_esperado = net_cuota_pendiente + flt(cuota.mora)
-
-			es_pago_parcial = (monto_recibido_gf > 0) and (monto_recibido_gf < total_a_pagar_esperado)
-
-			monto_adelanto_sig = 0.0
+			monto_adelanto_gf = flt(getattr(generar_factura, "monto_adelanto", 0.0))
 			modo_aplicar = getattr(generar_factura, "aplicar", None)
-			if es_pago_parcial:
-				total_esperado = round(monto_recibido_gf, 2)
-			else:
-				if modo_aplicar == "Abona a siguiente cuota" and monto_recibido_gf > total_a_pagar_esperado:
-					monto_adelanto_sig = flt(getattr(generar_factura, "monto_adelanto", 0.0)) or (monto_recibido_gf - total_a_pagar_esperado)
-					total_esperado = round(monto_recibido_gf, 2)
-				elif modo_aplicar in ("Abono a Capital", "Abono a Intereses") and monto_recibido_gf > total_a_pagar_esperado:
-					total_esperado = round(monto_recibido_gf, 2)
-				elif getattr(generar_factura, "abonar_siguiente_cuota", 0) and flt(getattr(generar_factura, "monto_adelanto", 0.0)) > 0:
-					monto_adelanto_sig = flt(generar_factura.monto_adelanto)
-					total_esperado = round(net_cuota_pendiente + flt(cuota.mora) + monto_adelanto_sig, 2)
-				else:
-					total_esperado = round(total_a_pagar_esperado, 2)
 
+			es_pago_parcial = (monto_recibido_gf > 0) and (monto_recibido_gf < total_a_pagar_esperado_factura)
+
+			monto_adelanto_sig_factura = 0.0
+			if es_pago_parcial:
+				total_esperado_factura = round(monto_recibido_gf, 2)
+			else:
+				if modo_aplicar == "Abona a siguiente cuota" and monto_recibido_gf > total_a_pagar_esperado_factura:
+					monto_adelanto_sig_factura = monto_adelanto_gf or (monto_recibido_gf - total_a_pagar_esperado_factura)
+					total_esperado_factura = round(monto_recibido_gf, 2)
+				elif modo_aplicar in ("Abono a Capital", "Abono a Intereses") and monto_recibido_gf > total_a_pagar_esperado_factura:
+					total_esperado_factura = round(monto_recibido_gf, 2)
+				elif getattr(generar_factura, "abonar_siguiente_cuota", 0) and monto_adelanto_gf > 0:
+					monto_adelanto_sig_factura = monto_adelanto_gf
+					total_esperado_factura = round(total_a_pagar_esperado_factura + monto_adelanto_sig_factura, 2)
+				elif monto_adelanto_gf > 0:
+					monto_adelanto_sig_factura = monto_adelanto_gf
+					total_esperado_factura = round(total_a_pagar_esperado_factura + monto_adelanto_sig_factura, 2)
+				else:
+					total_esperado_factura = round(total_a_pagar_esperado_factura, 2)
+
+			# Comparar con los totales cobrados en la factura (en moneda de facturación)
 			total_cobrado = round(flt(doc.paid_amount) + flt(doc.change_amount), 2)
 			total_factura = round(flt(doc.grand_total) + flt(doc.change_amount), 2)
 			direct_paid = round(flt(doc.paid_amount), 2)
 
-			diff_cobrado = abs(total_cobrado - total_esperado)
-			diff_factura = abs(total_factura - total_esperado)
-			diff_direct = abs(direct_paid - total_esperado)
+			diff_cobrado = abs(total_cobrado - total_esperado_factura)
+			diff_factura = abs(total_factura - total_esperado_factura)
+			diff_direct = abs(direct_paid - total_esperado_factura)
 
 			if diff_cobrado > 0.05 and diff_factura > 0.05 and diff_direct > 0.05:
 				frappe.throw(
 					_(
-						"El total de la factura debe ser exactamente {0}. "
-						"Total cobrado en factura: {1}"
+						"El total de la factura debe ser exactamente {0} {1}. "
+						"Total cobrado en factura: {2} {1}"
 					).format(
-						total_esperado,
+						total_esperado_factura,
+						invoice_currency,
 						total_cobrado if total_cobrado > 0 else direct_paid
 					)
 				)
 
 			if es_pago_parcial:
+				monto_recibido_finan = flt(monto_recibido_gf / conversion_rate, 4)
 				prev_adelantado = flt(getattr(cuota, "monto_adelantado", 0.0))
-				nuevo_adelantado = prev_adelantado + monto_recibido_gf
+				nuevo_adelantado = flt(prev_adelantado + monto_recibido_finan, 2)
+
 				frappe.db.set_value(
 					"Cuota de financiamiento",
 					cuota.name,
@@ -106,7 +126,7 @@ def process_financing_on_submit(doc):
 					update_modified=False
 				)
 
-				nota_adelanto = f"Se aplicó abono parcial/adelantado de L {monto_recibido_gf} desde factura {doc.name}."
+				nota_adelanto = f"Se aplicó abono parcial de {invoice_currency} {monto_recibido_gf:.2f} (@ tasa {conversion_rate} = {fin_currency} {monto_recibido_finan:.2f}) desde factura {doc.name}."
 				nota_existente = cstr(cuota.notas).strip()
 				nueva_nota = f"{nota_existente}\n{nota_adelanto}".strip() if nota_existente else nota_adelanto
 				frappe.db.set_value(
@@ -128,9 +148,7 @@ def process_financing_on_submit(doc):
 						update_modified=False
 					)
 
-				nuevo_saldo = flt(financiamiento.saldo_actual) - monto_recibido_gf
-				if nuevo_saldo < 0:
-					nuevo_saldo = 0
+				nuevo_saldo = max(0.0, flt(financiamiento.saldo_actual) - monto_recibido_finan)
 
 				frappe.db.set_value(
 					"Financiamientos",
@@ -150,7 +168,7 @@ def process_financing_on_submit(doc):
 					update_modified=False
 				)
 
-				nota_pago = f"Pagado completamente en factura {doc.name}."
+				nota_pago = f"Pagado completamente en factura {doc.name} ({invoice_currency} {total_cobrado:.2f} @ tasa {conversion_rate})."
 				nota_existente = cstr(cuota.notas).strip()
 				nueva_nota = f"{nota_existente}\n{nota_pago}".strip() if nota_existente else nota_pago
 				frappe.db.set_value(
@@ -161,9 +179,8 @@ def process_financing_on_submit(doc):
 					update_modified=False
 				)
 
-				nuevo_saldo = flt(financiamiento.saldo_actual) - (net_cuota_pendiente + flt(cuota.mora) + monto_adelanto_sig)
-				if nuevo_saldo < 0:
-					nuevo_saldo = 0
+				monto_adelanto_sig_finan = flt(monto_adelanto_sig_factura / conversion_rate, 4) if monto_adelanto_sig_factura > 0 else 0.0
+				nuevo_saldo = max(0.0, flt(financiamiento.saldo_actual) - (net_cuota_pendiente_finan + mora_finan + monto_adelanto_sig_finan))
 
 				frappe.db.set_value(
 					"Financiamientos",
@@ -173,8 +190,8 @@ def process_financing_on_submit(doc):
 					update_modified=False
 				)
 
-				if monto_adelanto_sig > 0:
-					monto_adelanto_restante = flt(monto_adelanto_sig)
+				if monto_adelanto_sig_finan > 0:
+					monto_adelanto_restante = flt(monto_adelanto_sig_finan)
 					for sig in financiamiento.cuotas[index + 1:]:
 						if monto_adelanto_restante <= 0:
 							break
@@ -195,7 +212,7 @@ def process_financing_on_submit(doc):
 							"sales_invoice": doc.name
 						}
 
-						nota_adelanto = f"Se aplicó abono adelantado de L {monto_a_aplicar_cuota} desde factura {doc.name}."
+						nota_adelanto = f"Se aplicó abono adelantado de {fin_currency} {monto_a_aplicar_cuota:.2f} desde factura {doc.name}."
 						nota_existente = cstr(sig.notas).strip()
 						nueva_nota = f"{nota_existente}\n{nota_adelanto}".strip() if nota_existente else nota_adelanto
 						update_dict["notas"] = nueva_nota

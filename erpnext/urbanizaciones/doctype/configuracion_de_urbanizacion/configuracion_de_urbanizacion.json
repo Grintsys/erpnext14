@@ -18,6 +18,10 @@
   "item_adelantos",
   "vencimiento_cuota",
   "naming_series",
+  "section_break_moneda",
+  "moneda_financiamiento",
+  "column_break_ardas",
+  "sincronizacion_automatica_tasa",
   "section_break_politicas",
   "exigir_cobertura_mora",
   "permitir_pagos_parciales_sin_mora",
@@ -192,11 +196,37 @@
    "fieldtype": "Select",
    "label": "M\u00e9todo de Reamortizaci\u00f3n a Intereses",
    "options": "Cr\u00e9dito Directo Cuota Posterior\nDescuento Prorrateado Futuro"
+  },
+  {
+   "fieldname": "section_break_moneda",
+   "fieldtype": "Section Break",
+   "label": "Moneda del Financiamiento"
+  },
+  {
+   "default": "HNL",
+   "description": "Moneda en la que se pactan los contratos de financiamiento. Si difiere de la moneda de la empresa, se utilizar\u00e1 la tasa oficial del Currency Exchange.",
+   "fieldname": "moneda_financiamiento",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Moneda de Financiamiento",
+   "options": "Currency",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "description": "Si est\u00e1 activo, el sistema consulta y actualiza la tasa oficial en Currency Exchange a las 12:00 AM. Si est\u00e1 inactivo, Tesorer\u00eda gestiona las tasas de forma manual.",
+   "fieldname": "sincronizacion_automatica_tasa",
+   "fieldtype": "Check",
+   "label": "Sincronizaci\u00f3n Autom\u00e1tica Diaria (12:00 AM)"
+  },
+  {
+   "fieldname": "column_break_ardas",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "links": [],
- "modified": "2026-09-02 00:29:58.800076",
+ "modified": "2026-09-29 18:33:20.285144",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Configuracion de Urbanizacion",

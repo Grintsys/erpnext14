@@ -2,9 +2,9 @@
 // For license information, please see license.txt
 
 frappe.ui.form.on('Financiamientos', {
-    setup: function(frm) {
+    setup: function (frm) {
         // Filtrar activos disponibles o reservados para la urbanización seleccionada en cabecera
-        frm.set_query('activos', function() {
+        frm.set_query('activos', function () {
             return {
                 query: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.activo_disponible_query',
                 filters: {
@@ -15,7 +15,7 @@ frappe.ui.form.on('Financiamientos', {
         });
 
         // Filtrar en la tabla de múltiples activos
-        frm.set_query('activo', 'activos_detalle', function(doc, cdt, cdn) {
+        frm.set_query('activo', 'activos_detalle', function (doc, cdt, cdn) {
             let row = locals[cdt] && locals[cdt][cdn];
             let urb = '';
             if (frm.doc.multiples_urbanizaciones) {
@@ -33,23 +33,33 @@ frappe.ui.form.on('Financiamientos', {
             };
         });
 
-        frm.set_query('centro_costo', function() {
+        frm.set_query('centro_costo', function () {
+            let filters = {
+                is_group: 0
+            };
+            if (frm.doc.company) {
+                filters.company = frm.doc.company;
+            }
             return {
-                filters: {
-                    is_group: 0
-                }
+                filters: filters
             };
         });
     },
 
-    onload: function(frm) {
+    onload: function (frm) {
+        if (frm.is_new() && !frm.doc.company) {
+            let default_company = frappe.defaults.get_user_default('Company') || frappe.defaults.get_global_default('company');
+            if (default_company) {
+                frm.set_value('company', default_company);
+            }
+        }
         calculate_capital_financiero(frm);
         calculate_cuota_estimada(frm);
         calculate_proxima_fecha(frm);
         calculate_saldo_actual(frm);
     },
 
-    refresh: function(frm) {
+    refresh: function (frm) {
         const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
         const isDraft = frm.doc.docstatus === 0;
 
@@ -82,7 +92,7 @@ frappe.ui.form.on('Financiamientos', {
             } else if (frm.doc.status === 'Cancelado') {
                 frm.page.set_indicator(__('Cancelado'), 'red');
             } else if (hasOverdue) {
-                frm.page.set_indicator(__('En Mora (L %s)', [format_currency(totalMora)]), 'red');
+                frm.page.set_indicator(__('En Mora ({0})', [format_currency(totalMora, frm.doc.currency || 'HNL')]), 'red');
             } else if (frm.doc.status === 'Activo') {
                 frm.page.set_indicator(__('Al Día (Activo)'), 'green');
             } else if (frm.doc.status === 'Refinanciado') {
@@ -101,9 +111,9 @@ frappe.ui.form.on('Financiamientos', {
                     <div style="display: flex; gap: 20px; font-size: 13px; padding: 5px 0; flex-wrap: wrap;">
                         <span><b>Cuotas Pagadas:</b> ${cuotasPagadas} / ${frm.doc.cuotas.length}</span>
                         ${hist_info}
-                        <span><b>Total Pagado:</b> ${format_currency(totalPagado)}</span>
-                        <span><b>Saldo Pendiente:</b> ${format_currency(frm.doc.saldo_actual || 0)}</span>
-                        ${totalMora > 0 ? `<span style="color: var(--text-color-danger, #e24c4c);"><b>Mora Acumulada:</b> ${format_currency(totalMora)}</span>` : ''}
+                        <span><b>Total Pagado:</b> ${format_currency(totalPagado, frm.doc.currency || 'HNL')}</span>
+                        <span><b>Saldo Pendiente:</b> ${format_currency(frm.doc.saldo_actual || 0, frm.doc.currency || 'HNL')}</span>
+                        ${totalMora > 0 ? `<span style="color: var(--text-color-danger, #e24c4c);"><b>Mora Acumulada:</b> ${format_currency(totalMora, frm.doc.currency || 'HNL')}</span>` : ''}
                     </div>
                 `;
                 frm.dashboard.set_headline(summary_html);
@@ -119,7 +129,7 @@ frappe.ui.form.on('Financiamientos', {
 
         // Mostrar botón 'Generar cuotas' mientras el documento esté en Borrador (docstatus == 0)
         if (isDraft) {
-            let btn = frm.add_custom_button(__('Generar cuotas'), function() {
+            let btn = frm.add_custom_button(__('Generar cuotas'), function () {
                 const required_fields = [
                     'customer',
                     'urbanizaciones',
@@ -166,7 +176,7 @@ frappe.ui.form.on('Financiamientos', {
                     if (hasCuotas) {
                         frappe.confirm(
                             __('Ya existen cuotas generadas. ¿Desea regenerar el plan de pagos con los datos actuales?'),
-                            function() {
+                            function () {
                                 if (frm.is_dirty()) {
                                     frm.save().then(() => call_generate()).catch(() => btn.prop('disabled', false));
                                 } else {
@@ -197,7 +207,7 @@ frappe.ui.form.on('Financiamientos', {
 
         // Botón para abrir "Generar Factura"
         if (!frm.is_new() && hasCuotas && frm.doc.status !== 'Completado' && frm.doc.status !== 'Cancelado') {
-            frm.add_custom_button(__('Generar Factura'), function() {
+            frm.add_custom_button(__('Generar Factura'), function () {
                 if (frm.is_dirty()) {
                     frappe.show_alert({ message: __('Guarde los cambios antes de abrir Generar Factura'), indicator: 'warning' });
                     return;
@@ -208,14 +218,14 @@ frappe.ui.form.on('Financiamientos', {
                 window.open(url, '_blank');
             }).addClass('btn-primary');
 
-            frm.add_custom_button(__('Actualizar Políticas de Cobro'), function() {
+            frm.add_custom_button(__('Actualizar Políticas de Cobro'), function () {
                 frappe.confirm(
                     __('¿Desea actualizar las políticas financieras de este contrato a la versión vigente en su Configuración de Urbanización?'),
-                    function() {
+                    function () {
                         frappe.call({
                             method: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.adoptar_nuevas_politicas',
                             args: { financiamiento_name: frm.doc.name },
-                            callback: function(r) {
+                            callback: function (r) {
                                 if (r.message && r.message.success) {
                                     frm.reload_doc();
                                 }
@@ -225,7 +235,7 @@ frappe.ui.form.on('Financiamientos', {
                 );
             }, __('Acciones'));
 
-            frm.add_custom_button(__('Cargar Pagos Históricos'), function() {
+            frm.add_custom_button(__('Cargar Pagos Históricos'), function () {
                 let d = new frappe.ui.Dialog({
                     title: __('Configurar Saldo Inicial / Pagos Históricos'),
                     fields: [
@@ -252,7 +262,7 @@ frappe.ui.form.on('Financiamientos', {
                         }
                     ],
                     primary_action_label: __('Aplicar Pagos Históricos'),
-                    primary_action: function(values) {
+                    primary_action: function (values) {
                         if (values.cuotas_pagadas < 0 || values.cuotas_pagadas > frm.doc.cuotas.length) {
                             frappe.msgprint(__('El número de cuotas debe estar entre 0 y ' + frm.doc.cuotas.length));
                             return;
@@ -268,7 +278,7 @@ frappe.ui.form.on('Financiamientos', {
                             },
                             freeze: true,
                             freeze_message: __('Aplicando pagos históricos...'),
-                            callback: function(r) {
+                            callback: function (r) {
                                 if (r.message && r.message.success) {
                                     frappe.show_alert({
                                         message: __('Se aplicaron {0} cuotas históricas correctamente.', [r.message.cuotas_pagadas]),
@@ -285,7 +295,37 @@ frappe.ui.form.on('Financiamientos', {
         }
     },
 
-    es_refinanciamiento: function(frm) {
+    configuracion_financiamiento: function (frm) {
+        if (frm.doc.configuracion_financiamiento) {
+            frappe.db.get_value('Configuracion de Urbanizacion', frm.doc.configuracion_financiamiento,
+                ['moneda_financiamiento', 'interes_anual', 'vencimiento_cuota', 'mora_diaria'],
+                function (r) {
+                    if (r) {
+                        if (r.moneda_financiamiento) {
+                            frm.set_value('currency', r.moneda_financiamiento);
+                        }
+                        if (!frm.doc.company) {
+                            let default_company = frappe.defaults.get_user_default('Company') || frappe.defaults.get_global_default('company');
+                            if (default_company) {
+                                frm.set_value('company', default_company);
+                            }
+                        }
+                        if (r.interes_anual !== undefined && (!frm.doc.interes_anual || frm.doc.interes_anual === 0)) {
+                            frm.set_value('interes_anual', r.interes_anual);
+                        }
+                        if (r.vencimiento_cuota && (!frm.doc.dia_vencimiento_cuota || frm.doc.dia_vencimiento_cuota === 0)) {
+                            frm.set_value('dia_vencimiento_cuota', r.vencimiento_cuota);
+                        }
+                        if (r.mora_diaria !== undefined && (!frm.doc.mora_diaria || frm.doc.mora_diaria === 0)) {
+                            frm.set_value('mora_diaria', r.mora_diaria);
+                        }
+                    }
+                }
+            );
+        }
+    },
+
+    es_refinanciamiento: function (frm) {
         const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
         if (frm.doc.es_refinanciamiento === 'Si') {
             frm.set_df_property('es_refinanciamiento', 'read_only', 1);
@@ -294,7 +334,7 @@ frappe.ui.form.on('Financiamientos', {
         }
     },
 
-    multiples_urbanizaciones: function(frm) {
+    multiples_urbanizaciones: function (frm) {
         if (!frm.doc.multiples_urbanizaciones && frm.doc.urbanizaciones) {
             (frm.doc.activos_detalle || []).forEach(row => {
                 if (row.urbanizacion !== frm.doc.urbanizaciones) {
@@ -307,10 +347,10 @@ frappe.ui.form.on('Financiamientos', {
         }
     },
 
-    urbanizaciones: function(frm) {
+    urbanizaciones: function (frm) {
         if (frm.doc.urbanizaciones) {
             if (!frm.doc.centro_costo) {
-                frappe.db.get_value('Urbanizaciones', frm.doc.urbanizaciones, 'cost_center', function(r) {
+                frappe.db.get_value('Urbanizaciones', frm.doc.urbanizaciones, 'cost_center', function (r) {
                     if (r && r.cost_center) {
                         frm.set_value('centro_costo', r.cost_center);
                     }
@@ -318,7 +358,7 @@ frappe.ui.form.on('Financiamientos', {
             }
         }
         if (frm.doc.activos) {
-            frappe.db.get_value('Activos', frm.doc.activos, 'urbanizaciones', function(r) {
+            frappe.db.get_value('Activos', frm.doc.activos, 'urbanizaciones', function (r) {
                 if (r && r.urbanizaciones !== frm.doc.urbanizaciones) {
                     frm.set_value('activos', '');
                 }
@@ -328,7 +368,7 @@ frappe.ui.form.on('Financiamientos', {
             (frm.doc.activos_detalle || []).forEach(row => {
                 frappe.model.set_value(row.doctype, row.name, 'urbanizacion', frm.doc.urbanizaciones);
                 if (row.activo) {
-                    frappe.db.get_value('Activos', row.activo, 'urbanizaciones', function(r) {
+                    frappe.db.get_value('Activos', row.activo, 'urbanizaciones', function (r) {
                         if (r && r.urbanizaciones !== frm.doc.urbanizaciones) {
                             frappe.model.set_value(row.doctype, row.name, 'activo', '');
                         }
@@ -338,9 +378,9 @@ frappe.ui.form.on('Financiamientos', {
         }
     },
 
-    activos: function(frm) {
+    activos: function (frm) {
         if (frm.doc.activos) {
-            frappe.db.get_value('Activos', frm.doc.activos, ['centro_de_costo', 'precio', 'status', 'descripcion_lote', 'urbanizaciones'], function(r) {
+            frappe.db.get_value('Activos', frm.doc.activos, ['centro_de_costo', 'precio', 'status', 'descripcion_lote', 'urbanizaciones'], function (r) {
                 if (r) {
                     if (r.urbanizaciones && !frm.doc.urbanizaciones) {
                         frm.set_value('urbanizaciones', r.urbanizaciones);
@@ -364,49 +404,49 @@ frappe.ui.form.on('Financiamientos', {
         }
     },
 
-    monto_contrato: function(frm) {
-        calculate_capital_financiero(frm);
-        calculate_cuota_estimada(frm);        
-    },
-
-    prima: function(frm) {
+    monto_contrato: function (frm) {
         calculate_capital_financiero(frm);
         calculate_cuota_estimada(frm);
     },
 
-    interes_anual: function(frm) {
+    prima: function (frm) {
+        calculate_capital_financiero(frm);
         calculate_cuota_estimada(frm);
     },
 
-    plazo_meses: function(frm) {
+    interes_anual: function (frm) {
         calculate_cuota_estimada(frm);
     },
 
-    fecha_inicio: function(frm) {
+    plazo_meses: function (frm) {
+        calculate_cuota_estimada(frm);
+    },
+
+    fecha_inicio: function (frm) {
         calculate_proxima_fecha(frm);
     },
 
-    dia_vencimiento_cuota: function(frm) {
+    dia_vencimiento_cuota: function (frm) {
         calculate_proxima_fecha(frm);
     },
 
-    capital_financiado: function(frm) {
-        calculate_saldo_actual(frm);        
+    capital_financiado: function (frm) {
+        calculate_saldo_actual(frm);
     }
 });
 
 // Eventos de la tabla de múltiples activos
 frappe.ui.form.on('Financiamiento Activo Detalle', {
-    activos_detalle_add: function(frm, cdt, cdn) {
+    activos_detalle_add: function (frm, cdt, cdn) {
         if (!frm.doc.multiples_urbanizaciones && frm.doc.urbanizaciones) {
             frappe.model.set_value(cdt, cdn, 'urbanizacion', frm.doc.urbanizaciones);
         }
     },
 
-    urbanizacion: function(frm, cdt, cdn) {
+    urbanizacion: function (frm, cdt, cdn) {
         let row = locals[cdt][cdn];
         if (row.activo) {
-            frappe.db.get_value('Activos', row.activo, 'urbanizaciones', function(r) {
+            frappe.db.get_value('Activos', row.activo, 'urbanizaciones', function (r) {
                 if (r && r.urbanizaciones && r.urbanizaciones !== row.urbanizacion) {
                     frappe.model.set_value(cdt, cdn, 'activo', '');
                 }
@@ -414,15 +454,15 @@ frappe.ui.form.on('Financiamiento Activo Detalle', {
         }
     },
 
-    activo: function(frm, cdt, cdn) {
+    activo: function (frm, cdt, cdn) {
         let row = locals[cdt][cdn];
         if (row.activo) {
-            frappe.db.get_value('Activos', row.activo, ['descripcion_lote', 'precio', 'centro_de_costo', 'status', 'urbanizaciones'], function(r) {
+            frappe.db.get_value('Activos', row.activo, ['descripcion_lote', 'precio', 'centro_de_costo', 'status', 'urbanizaciones'], function (r) {
                 if (r) {
                     frappe.model.set_value(cdt, cdn, 'descripcion_lote', r.descripcion_lote || '');
                     frappe.model.set_value(cdt, cdn, 'precio', r.precio || 0);
                     frappe.model.set_value(cdt, cdn, 'centro_de_costo', r.centro_de_costo || '');
-                    
+
                     if (r.urbanizaciones) {
                         frappe.model.set_value(cdt, cdn, 'urbanizacion', r.urbanizaciones);
                     }
@@ -448,11 +488,11 @@ frappe.ui.form.on('Financiamiento Activo Detalle', {
         }
     },
 
-    precio: function(frm) {
+    precio: function (frm) {
         recalculate_multi_assets_total(frm);
     },
 
-    activos_detalle_remove: function(frm) {
+    activos_detalle_remove: function (frm) {
         recalculate_multi_assets_total(frm);
     }
 });
@@ -471,11 +511,11 @@ function recalculate_multi_assets_total(frm) {
 
 function calculate_capital_financiero(frm) {
     let monto = flt(frm.doc.monto_contrato);
-    let prima = flt(frm.doc.prima);    
+    let prima = flt(frm.doc.prima);
 
     const hasCuotas = Array.isArray(frm.doc.cuotas) && frm.doc.cuotas.length > 0;
     if (frm.is_new() || !hasCuotas) {
-        frm.set_value('capital_financiado', flt(monto - prima, 2));    
+        frm.set_value('capital_financiado', flt(monto - prima, 2));
     }
 }
 
@@ -501,7 +541,7 @@ function calculate_cuota_estimada(frm) {
 }
 
 function calculate_proxima_fecha(frm) {
-    if (frm.is_new()){
+    if (frm.is_new()) {
         const fecha_inicio = frm.doc.fecha_inicio;
         const dia_vencimiento = frm.doc.dia_vencimiento_cuota;
 
@@ -513,7 +553,7 @@ function calculate_proxima_fecha(frm) {
         } else {
             frm.set_value('fecha_vencimiento_cuota', null);
         }
-    }    
+    }
 }
 
 function calculate_saldo_actual(frm) {

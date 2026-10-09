@@ -21,6 +21,8 @@ STATUS_CUOTA = [
 # Mapea fieldname -> etiqueta para mensajes amigables (ajusta si quieres otros labels)
 REQUIRED_FIELDS = {
     "naming_series": "Series",
+    "company": "Compañía",
+    "currency": "Moneda",
     "customer": "Cliente",
     "urbanizaciones": "Urbanización",
     "activos": "Activo",
@@ -50,6 +52,15 @@ def validate_required_fields(doc):
     Valida en servidor que los campos marcados como 'reqd' en financiamientos.json
     estén presentes. Lanza frappe.ValidationError (frappe.throw) con la lista de faltantes.
     """
+    if not doc.get("company"):
+        doc.company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+    if not doc.get("currency"):
+        if doc.get("configuracion_financiamiento"):
+            doc.currency = frappe.db.get_value("Configuracion de Urbanizacion", doc.configuracion_financiamiento, "moneda_financiamiento")
+        if not doc.get("currency") and doc.get("company"):
+            doc.currency = frappe.get_cached_value("Company", doc.company, "default_currency")
+        if not doc.get("currency"):
+            doc.currency = frappe.db.get_single_value("Global Defaults", "default_currency") or "HNL"
     missing = []
     for fieldname, label in REQUIRED_FIELDS.items():
         val = doc.get(fieldname)
@@ -60,6 +71,15 @@ def validate_required_fields(doc):
 
 class Financiamientos(Document):
     def validate(self):
+        if not self.company:
+            self.company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
+        if not self.currency:
+            if self.configuracion_financiamiento:
+                self.currency = frappe.db.get_value("Configuracion de Urbanizacion", self.configuracion_financiamiento, "moneda_financiamiento")
+            if not self.currency and self.company:
+                self.currency = frappe.get_cached_value("Company", self.company, "default_currency")
+            if not self.currency:
+                self.currency = frappe.db.get_single_value("Global Defaults", "default_currency") or "HNL"
         self.validate_activo_urbanizacion()
         self.ensure_politicas_snapshot()
         self.calculate_financial_totals()

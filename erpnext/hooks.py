@@ -420,6 +420,10 @@ scheduler_events = {
 		"45 0 * * *": [
 			"erpnext.stock.reorder_item.reorder_item",
 		],
+		# Daily at midnight (12:00 AM) for exchange rate synchronization
+		"0 0 * * *": [
+			"erpnext.urbanizaciones.utils.currency_helper.sync_daily_exchange_rate",
+		],
 	},
 	"all": [
 		"erpnext.crm.doctype.social_media_post.social_media_post.process_scheduled_social_media_posts",

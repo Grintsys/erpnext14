@@ -14,6 +14,7 @@ def execute(filters=None):
         {"fieldname": "name", "fieldtype": "Data", "label": "Nombre", "width": 140},
         {"fieldname": "rtn", "fieldtype": "Data", "label": "RTN", "width": 120},
         {"fieldname": "total_exempt", "fieldtype": "Currency", "label": "Total Exento", "width": 110},
+        {"fieldname": "total_exonerated", "fieldtype": "Currency", "label": "Total Exonerado", "width": 110},
         {"fieldname": "base_isv_15%", "fieldtype": "Currency", "label": "Base ISV 15%", "width": 110},
         {"fieldname": "isv_15%", "fieldtype": "Currency", "label": "ISV 15%", "width": 110},
         {"fieldname": "base_isv_18%", "fieldtype": "Currency", "label": "Base ISV 18%", "width": 110},
@@ -67,6 +68,7 @@ def execute(filters=None):
             si.customer,
             si.is_return,
             si.exempt_amount,
+            si.exonerated_amount,
             si.taxed_amount_15,
             si.isv_15,
             si.taxed_amount_18,
@@ -90,6 +92,7 @@ def execute(filters=None):
         # Calcular monto bruto
         monto_bruto = (
             flt(sales.exempt_amount)
+            + flt(sales.exonerated_amount)
             + flt(sales.taxed_amount_15)
             + flt(sales.taxed_amount_18)
             - flt(sales.discount_amount)
@@ -103,6 +106,7 @@ def execute(filters=None):
             sales.customer,
             rtn,
             sales.exempt_amount,
+            sales.exonerated_amount,
             sales.taxed_amount_15,
             sales.isv_15,
             sales.taxed_amount_18,

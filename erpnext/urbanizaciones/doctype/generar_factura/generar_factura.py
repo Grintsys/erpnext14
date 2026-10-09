@@ -3,6 +3,7 @@ import frappe
 from frappe import _
 from frappe.model.document import Document
 from frappe.utils import today, flt
+from erpnext.urbanizaciones.utils.currency_helper import get_daily_exchange_rate
 
 
 def get_pos_payment_amount(invoice):
@@ -51,6 +52,13 @@ def capture_financing_snapshot(financiamiento_doc):
 class GenerarFactura(Document):
 
     def validate(self):
+        if not self.company:
+            if self.financiamiento:
+                self.company = frappe.db.get_value("Financiamientos", self.financiamiento, "company")
+            if not self.company and getattr(self, "pos_profile", None):
+                self.company = frappe.db.get_value("POS Profile", self.pos_profile, "company")
+            if not self.company:
+                self.company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value("Global Defaults", "default_company")
         self.load_pending_quota()
 
     def on_submit(self):
@@ -144,13 +152,43 @@ class GenerarFactura(Document):
 
         self.customer = financiamiento.customer
         self.date_quote_financing = cuota.fecha_vencimiento_cuota
-        self.total_cuota = net_cuota
+        self.currency_financiamiento = getattr(financiamiento, "currency", None) or "USD"
 
-        if hasattr(self, "total_mora"):
-            self.total_mora = flt(cuota.mora)
+        # Moneda del perfil POS o moneda local de la empresa
+        company = self.company or financiamiento.company
+        company_currency = None
+        if company:
+            company_currency = frappe.get_cached_value("Company", company, "default_currency")
+        if not company_currency:
+            company_currency = frappe.db.get_single_value("Global Defaults", "default_currency") or "HNL"
 
-        if hasattr(self, "total_a_pagar"):
-            self.total_a_pagar = net_cuota + flt(self.total_mora)
+        if self.pos_profile:
+            self.currency = frappe.db.get_value("POS Profile", self.pos_profile, "currency") or company_currency
+        elif not self.currency:
+            self.currency = company_currency
+
+        # Factor de cambio
+        if self.currency_financiamiento != self.currency:
+            self.conversion_rate = get_daily_exchange_rate(
+                self.currency_financiamiento,
+                self.currency,
+                self.date_quote_financing or today(),
+                company=company
+            )
+        else:
+            self.conversion_rate = 1.0
+
+        rate = flt(self.conversion_rate) or 1.0
+
+        # Montos en moneda del financiamiento
+        self.total_cuota_financiamiento = net_cuota
+        self.total_mora_financiamiento = flt(cuota.mora)
+        self.total_a_pagar_financiamiento = net_cuota + flt(cuota.mora)
+
+        # Montos convertidos a la moneda de facturación (Caja)
+        self.total_cuota = flt(net_cuota * rate, 2)
+        self.total_mora = flt(flt(cuota.mora) * rate, 2)
+        self.total_a_pagar = flt(self.total_cuota + self.total_mora, 2)
 
         if hasattr(self, "total_facturar") and not self.total_facturar:
             self.total_facturar = self.total_a_pagar
@@ -229,12 +267,25 @@ class GenerarFactura(Document):
 
         cuota = cuotas_pendientes[0]
 
-        # Net cuota to be billed (total_cuota - monto_adelantado)
-        net_cuota_pendiente = flt(cuota.total_cuota) - flt(getattr(cuota, "monto_adelantado", 0.0))
-        if net_cuota_pendiente < 0:
-            net_cuota_pendiente = 0.0
+        # Net cuota to be billed (total_cuota - monto_adelantado) en moneda de financiamiento
+        net_cuota_pendiente_finan = flt(cuota.total_cuota) - flt(getattr(cuota, "monto_adelantado", 0.0))
+        if net_cuota_pendiente_finan < 0:
+            net_cuota_pendiente_finan = 0.0
 
-        total_a_pagar_esperado = net_cuota_pendiente + flt(cuota.mora)
+        rate_conv = flt(self.conversion_rate) or 1.0
+        company_currency = None
+        if self.company:
+            company_currency = frappe.get_cached_value("Company", self.company, "default_currency")
+        if not company_currency:
+            company_currency = frappe.db.get_single_value("Global Defaults", "default_currency") or "HNL"
+
+        pos_currency = getattr(self, "currency", None) or getattr(pos_profile, "currency", None) or company_currency
+        fin_currency = getattr(self, "currency_financiamiento", None) or getattr(financiamiento, "currency", None) or company_currency
+
+        # Totales esperados en moneda de facturación (Caja)
+        net_cuota_esperada_factura = flt(net_cuota_pendiente_finan * rate_conv, 2)
+        mora_esperada_factura = flt(flt(cuota.mora) * rate_conv, 2)
+        total_a_pagar_esperado = net_cuota_esperada_factura + mora_esperada_factura
         monto_recibido_val = flt(self.monto_recibido)
 
         # Validar cobertura de mora exigida por política
@@ -253,7 +304,7 @@ class GenerarFactura(Document):
 
         target_cuota_adelanto = None
         monto_adelanto_aplicar = 0.0
-        net_cuota_a_facturar = net_cuota_pendiente
+        net_cuota_a_facturar = net_cuota_esperada_factura
         monto_abono_extraordinario = 0.0
         tipo_abono_extraordinario = None
 
@@ -316,7 +367,7 @@ class GenerarFactura(Document):
                     )
 
                 saldos_futuros = [
-                    flt(c.total_cuota) - flt(getattr(c, "monto_adelantado", 0.0))
+                    (flt(c.total_cuota) - flt(getattr(c, "monto_adelantado", 0.0))) * rate_conv
                     for c in cuotas_futuras
                 ]
                 saldo_total_futuro = sum(saldos_futuros)
@@ -335,20 +386,20 @@ class GenerarFactura(Document):
                         current_sum += s
                         cum_sums.append(current_sum)
 
-                    match_found = any(abs(monto_adelanto_aplicar - cum_s) <= 0.01 for cum_s in cum_sums)
+                    match_found = any(abs(monto_adelanto_aplicar - cum_s) <= 0.05 for cum_s in cum_sums)
 
                     if not match_found:
                         frappe.throw(
                             _(
-                                "La política de 'Coincidencia Exacta' requiere que el anticipo cubra exactamente el total de 1 o más cuotas completas posteriores. El monto entregado (L {0}) no coincide con ninguna combinación exacta de cuotas futuras."
-                            ).format(monto_adelanto_aplicar)
+                                "La política de 'Coincidencia Exacta' requiere que el anticipo cubra exactamente el total de 1 o más cuotas completas posteriores. El monto entregado ({0} {1}) no coincide con ninguna combinación exacta de cuotas futuras."
+                            ).format(pos_currency, monto_adelanto_aplicar)
                         )
 
-                elif monto_adelanto_aplicar > saldo_total_futuro + 0.01:
+                elif monto_adelanto_aplicar > saldo_total_futuro + 0.05:
                     frappe.throw(
                         _(
-                            "El monto del adelanto (L {0}) supera el saldo total pendiente de todas las cuotas futuras (L {1}). Para montos superiores debe utilizar Abono Extraordinario a Capital."
-                        ).format(monto_adelanto_aplicar, saldo_total_futuro)
+                            "El monto del adelanto ({0} {1}) supera el saldo total pendiente de todas las cuotas futuras ({0} {2}). Para montos superiores debe utilizar Abono Extraordinario a Capital."
+                        ).format(pos_currency, monto_adelanto_aplicar, saldo_total_futuro)
                     )
 
                 target_cuota_adelanto = cuotas_futuras[0]
@@ -376,6 +427,13 @@ class GenerarFactura(Document):
         # ==========================
         invoice = frappe.new_doc("Sales Invoice")
 
+        if getattr(self, "company", None):
+            invoice.company = self.company
+        elif getattr(financiamiento, "company", None):
+            invoice.company = financiamiento.company
+        elif getattr(pos_profile, "company", None):
+            invoice.company = pos_profile.company
+
         invoice.naming_series = pos_profile.prefix
         invoice.is_pos = 1
         invoice.pos_profile = self.pos_profile
@@ -384,6 +442,7 @@ class GenerarFactura(Document):
         invoice.ignore_pricing_rule = 1
         invoice.invoice_generate = self.name
         invoice.date_quote_financing = cuota.fecha_vencimiento_cuota
+        invoice.currency = pos_currency
 
         if hasattr(invoice, "cost_center"):
             invoice.cost_center = financiamiento.centro_costo
@@ -399,11 +458,17 @@ class GenerarFactura(Document):
             row.rate = net_cuota_a_facturar
             row.cost_center = financiamiento.centro_costo
 
-            row.description = (
-                f"Cuota #{cuota.numero_cuota} "
-                f"con vencimiento "
-                f"{cuota.fecha_vencimiento_cuota}"
-            )
+            if pos_currency != fin_currency and rate_conv != 1.0:
+                row.description = (
+                    f"Cuota #{cuota.numero_cuota} "
+                    f"({fin_currency} {net_cuota_pendiente_finan:.2f} @ TC {rate_conv:.4f}) "
+                    f"con vencimiento {cuota.fecha_vencimiento_cuota}"
+                )
+            else:
+                row.description = (
+                    f"Cuota #{cuota.numero_cuota} "
+                    f"con vencimiento {cuota.fecha_vencimiento_cuota}"
+                )
 
         # ==========================
         # ITEM MORA
@@ -419,13 +484,18 @@ class GenerarFactura(Document):
 
             row.item_code = configuracion.item_mora
             row.qty = 1
-            row.rate = cuota.mora
+            row.rate = mora_esperada_factura
             row.cost_center = financiamiento.centro_costo
 
-            row.description = (
-                f"Mora correspondiente a la "
-                f"cuota #{cuota.numero_cuota}"
-            )
+            if pos_currency != fin_currency and rate_conv != 1.0:
+                row.description = (
+                    f"Mora correspondiente a la cuota #{cuota.numero_cuota} "
+                    f"({fin_currency} {flt(cuota.mora):.2f} @ TC {rate_conv:.4f})"
+                )
+            else:
+                row.description = (
+                    f"Mora correspondiente a la cuota #{cuota.numero_cuota}"
+                )
 
         # ==========================
         # ITEM ADELANTO (Parcial o Siguiente cuota)
@@ -476,8 +546,6 @@ class GenerarFactura(Document):
         # ==========================
         invoice.insert(ignore_permissions=True)
 
-        # ERPNext applies the POS profile and calculates the final totals during insert.
-        # Synchronize the payment afterwards so disabled rounding preserves all cents.
         default_payment = next((payment for payment in invoice.payments if payment.default), None)
         if not default_payment:
             frappe.throw(_("La factura POS no tiene un modo de pago predeterminado."))
@@ -497,17 +565,47 @@ class GenerarFactura(Document):
         invoice.submit()
 
         # ==========================
+        # ACTUALIZAR FINANCIAMIENTO (EN MONEDA DE CONTRATO USD)
+        # ==========================
+        # Convertir montos a la moneda del contrato antes de actualizar saldos de financiamiento
+        advance_in_fin_curr = flt(monto_adelanto_aplicar / rate_conv, 4) if rate_conv > 0 else monto_adelanto_aplicar
+        abono_in_fin_curr = flt(monto_abono_extraordinario / rate_conv, 4) if rate_conv > 0 else monto_abono_extraordinario
+
+        if es_pago_parcial:
+            adelanto_previo = flt(getattr(cuota, "monto_adelantado", 0.0))
+            nuevo_adelanto = adelanto_previo + advance_in_fin_curr
+            frappe.db.set_value("Cuota de financiamiento", cuota.name, "monto_adelantado", nuevo_adelanto, update_modified=False)
+        else:
+            frappe.db.set_value("Cuota de financiamiento", cuota.name, "status", "Pagado", update_modified=False)
+            if target_cuota_adelanto and advance_in_fin_curr > 0:
+                adelanto_previo_futuro = flt(getattr(target_cuota_adelanto, "monto_adelantado", 0.0))
+                nuevo_adelanto_futuro = adelanto_previo_futuro + advance_in_fin_curr
+                target_cuota_total = flt(target_cuota_adelanto.total_cuota)
+                if abs(nuevo_adelanto_futuro - target_cuota_total) <= 0.05 or nuevo_adelanto_futuro >= target_cuota_total:
+                    frappe.db.set_value("Cuota de financiamiento", target_cuota_adelanto.name, {
+                        "status": "Anticipada",
+                        "monto_adelantado": nuevo_adelanto_futuro
+                    }, update_modified=False)
+                else:
+                    frappe.db.set_value("Cuota de financiamiento", target_cuota_adelanto.name, "monto_adelantado", nuevo_adelanto_futuro, update_modified=False)
+
+        # Actualizar saldo_actual del financiamiento
+        capital_cuota = flt(cuota.capital)
+        saldo_actual_prev = flt(financiamiento.saldo_actual)
+        nuevo_saldo = saldo_actual_prev - capital_cuota if not es_pago_parcial else saldo_actual_prev
+        if nuevo_saldo < 0:
+            nuevo_saldo = 0.0
+        frappe.db.set_value("Financiamientos", financiamiento.name, "saldo_actual", nuevo_saldo, update_modified=False)
+
+        # ==========================
         # EJECUTAR REAMORTIZACIÓN SI APLICA ABONO EXTRAORDINARIO
         # ==========================
-        if monto_abono_extraordinario > 0 and tipo_abono_extraordinario:
+        if abono_in_fin_curr > 0 and tipo_abono_extraordinario:
             financiamiento_reload = frappe.get_doc("Financiamientos", financiamiento.name)
             if tipo_abono_extraordinario == "Capital":
-                financiamiento_reload.reamortizar_por_abono_capital(monto_abono_extraordinario, invoice_name=invoice.name)
+                financiamiento_reload.reamortizar_por_abono_capital(abono_in_fin_curr, invoice_name=invoice.name)
             elif tipo_abono_extraordinario == "Intereses":
-                financiamiento_reload.reamortizar_por_abono_interes(monto_abono_extraordinario, invoice_name=invoice.name)
-
-
-
+                financiamiento_reload.reamortizar_por_abono_interes(abono_in_fin_curr, invoice_name=invoice.name)
 
         # ==========================
         # GUARDAR REFERENCIA
@@ -521,33 +619,33 @@ class GenerarFactura(Document):
         # ==========================
         # ACTUALIZAR DOCUMENTO
         # ==========================
-        self.db_set("total_cuota", net_cuota_pendiente)
-        self.db_set("total_mora", cuota.mora)
-        self.db_set("total_a_pagar", net_cuota_pendiente + flt(cuota.mora))
+        self.db_set("total_cuota", net_cuota_a_facturar)
+        self.db_set("total_mora", mora_esperada_factura)
+        self.db_set("total_a_pagar", total_a_pagar_esperado)
         self.db_set("monto_adelanto", monto_adelanto_aplicar)
-        self.db_set("total_facturar", invoice.grand_total or (net_cuota_a_facturar + flt(cuota.mora) + monto_adelanto_aplicar))
+        self.db_set("total_facturar", invoice.grand_total or (net_cuota_a_facturar + mora_esperada_factura + monto_adelanto_aplicar))
         self.db_set("date_quote_financing", cuota.fecha_vencimiento_cuota)
         self.db_set("estado_previo_financiamiento", snapshot_json)
 
-        # Actualizar atributos en memoria para que el formulario Desk conserve los montos sin ponerse dirty/no guardado
-        self.total_cuota = net_cuota_pendiente
-        self.total_mora = cuota.mora
-        self.total_a_pagar = net_cuota_pendiente + flt(cuota.mora)
+        self.total_cuota = net_cuota_a_facturar
+        self.total_mora = mora_esperada_factura
+        self.total_a_pagar = total_a_pagar_esperado
         self.monto_adelanto = monto_adelanto_aplicar
-        self.total_facturar = invoice.grand_total or (net_cuota_a_facturar + flt(cuota.mora) + monto_adelanto_aplicar)
+        self.total_facturar = invoice.grand_total or (net_cuota_a_facturar + mora_esperada_factura + monto_adelanto_aplicar)
         self.sales_invoice = invoice.name
         self.estado_previo_financiamiento = snapshot_json
 
         if es_pago_parcial:
-            saldo_restante_cuota = net_cuota_pendiente - monto_recibido_val
+            saldo_restante_cuota = total_a_pagar_esperado - monto_recibido_val
             if saldo_restante_cuota < 0:
                 saldo_restante_cuota = 0.0
             frappe.msgprint(
                 _(
-                    "Se registró un abono parcial de L {0} a la cuota #{1}.<br>"
-                    "Saldo pendiente restante de la cuota: L {2}.<br><br>"
-                    "<b>Factura {3} creada correctamente.</b>"
+                    "Se registró un abono parcial de {0} {1} a la cuota #{2}.<br>"
+                    "Saldo pendiente restante de la cuota: {0} {3}.<br><br>"
+                    "<b>Factura {4} creada correctamente.</b>"
                 ).format(
+                    pos_currency,
                     monto_recibido_val,
                     cuota.numero_cuota,
                     saldo_restante_cuota,
@@ -558,14 +656,15 @@ class GenerarFactura(Document):
             frappe.msgprint(
                 _(
                     "<b>Factura {0} creada y sometida correctamente.</b><br>"
-                    "Cobro procesado para la cuota #{1} del financiamiento {2}."
+                    "Cobro procesado para la cuota #{1} del financiamiento {2} ({3} {4})."
                 ).format(
                     invoice.name,
                     cuota.numero_cuota,
-                    financiamiento.name
+                    financiamiento.name,
+                    pos_currency,
+                    self.total_facturar
                 )
             )
-
 
 
 @frappe.whitelist()
@@ -587,8 +686,8 @@ def get_financiamientos(customer):
 
 
 @frappe.whitelist()
-def get_pending_quota_details(financiamiento):
-    """Obtiene los detalles de la cuota pendiente para un financiamiento en tiempo real"""
+def get_pending_quota_details(financiamiento, pos_profile=None):
+    """Obtiene los detalles de la cuota pendiente para un financiamiento con conversión cambiaria"""
     if not financiamiento:
         return {}
 
@@ -610,18 +709,46 @@ def get_pending_quota_details(financiamiento):
         return {}
 
     cuota = cuotas_pendientes[0]
-    net_cuota = flt(cuota.total_cuota) - flt(getattr(cuota, "monto_adelantado", 0.0))
-    if net_cuota < 0:
-        net_cuota = 0.0
+    net_cuota_finan = flt(cuota.total_cuota) - flt(getattr(cuota, "monto_adelantado", 0.0))
+    if net_cuota_finan < 0:
+        net_cuota_finan = 0.0
 
-    total_mora = flt(cuota.mora)
-    total_a_pagar = net_cuota + total_mora
+    total_mora_finan = flt(cuota.mora)
+    total_a_pagar_finan = net_cuota_finan + total_mora_finan
+
+    company = financiamiento_doc.company or frappe.defaults.get_user_default("Company")
+    company_currency = None
+    if company:
+        company_currency = frappe.get_cached_value("Company", company, "default_currency")
+    if not company_currency:
+        company_currency = frappe.db.get_single_value("Global Defaults", "default_currency") or "HNL"
+
+    currency_finan = getattr(financiamiento_doc, "currency", None) or "USD"
+    currency_pos = company_currency
+    if pos_profile:
+        currency_pos = frappe.db.get_value("POS Profile", pos_profile, "currency") or company_currency
+
+    conversion_rate = get_daily_exchange_rate(
+        currency_finan,
+        currency_pos,
+        cuota.fecha_vencimiento_cuota or today(),
+        company=company
+    )
+
+    rate = flt(conversion_rate) or 1.0
 
     return {
         "customer": financiamiento_doc.customer,
+        "company": financiamiento_doc.company,
+        "currency_financiamiento": currency_finan,
+        "currency": currency_pos,
+        "conversion_rate": rate,
         "date_quote_financing": cuota.fecha_vencimiento_cuota,
-        "total_cuota": net_cuota,
-        "total_mora": total_mora,
-        "total_a_pagar": total_a_pagar,
+        "total_cuota_financiamiento": net_cuota_finan,
+        "total_mora_financiamiento": total_mora_finan,
+        "total_a_pagar_financiamiento": total_a_pagar_finan,
+        "total_cuota": flt(net_cuota_finan * rate, 2),
+        "total_mora": flt(total_mora_finan * rate, 2),
+        "total_a_pagar": flt(total_a_pagar_finan * rate, 2),
         "cuota_numero": cuota.numero_cuota
     }

@@ -1,5 +1,6 @@
 {
  "actions": [],
+ "allow_import": 1,
  "allow_rename": 1,
  "autoname": "naming_series:",
  "creation": "2025-09-14 00:10:33.455982",
@@ -10,6 +11,9 @@
  "field_order": [
   "section_break_1",
   "naming_series",
+  "company",
+  "currency",
+  "column_break_qpcoj",
   "customer",
   "urbanizaciones",
   "centro_costo",
@@ -55,6 +59,27 @@
    "in_list_view": 1,
    "label": "Series",
    "options": "FIN-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Compa\u00f1\u00eda",
+   "options": "Company",
+   "remember_last_selected_value": 1,
+   "reqd": 1
+  },
+  {
+   "default": "HNL",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Moneda",
+   "options": "Currency",
+   "remember_last_selected_value": 1,
    "reqd": 1
   },
   {
@@ -287,13 +312,13 @@
    "collapsible": 1,
    "fieldname": "section_break_migracion",
    "fieldtype": "Section Break",
-   "label": "Migración Histórica / Saldo Inicial"
+   "label": "Migraci\u00f3n Hist\u00f3rica / Saldo Inicial"
   },
   {
    "default": "0",
    "fieldname": "es_saldo_inicial",
    "fieldtype": "Check",
-   "label": "¿Es Migración Histórica / Saldo Inicial?"
+   "label": "\u00bfEs Migraci\u00f3n Hist\u00f3rica / Saldo Inicial?"
   },
   {
    "default": "0",
@@ -310,19 +335,23 @@
    "depends_on": "eval:doc.es_saldo_inicial==1",
    "fieldname": "referencia_migracion",
    "fieldtype": "Data",
-   "label": "No. Recibo / Referencia Histórica"
+   "label": "No. Recibo / Referencia Hist\u00f3rica"
   },
   {
    "depends_on": "eval:doc.es_saldo_inicial==1",
    "fieldname": "fecha_corte_migracion",
    "fieldtype": "Date",
-   "label": "Fecha Último Pago Histórico"
+   "label": "Fecha \u00daltimo Pago Hist\u00f3rico"
+  },
+  {
+   "fieldname": "column_break_qpcoj",
+   "fieldtype": "Column Break"
   }
  ],
  "index_web_pages_for_search": 1,
  "is_submittable": 1,
  "links": [],
- "modified": "2026-09-18 11:45:30.258759",
+ "modified": "2026-09-29 18:22:59.665379",
  "modified_by": "Administrator",
  "module": "Urbanizaciones",
  "name": "Financiamientos",
@@ -335,6 +364,7 @@
    "delete": 1,
    "email": 1,
    "export": 1,
+   "import": 1,
    "print": 1,
    "read": 1,
    "report": 1,

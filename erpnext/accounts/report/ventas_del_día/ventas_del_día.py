@@ -21,6 +21,7 @@ def get_columns():
         _("Serie") + "::160",
         _("Rango") + "::220",
         _("Ventas exentas") + ":Currency:120",
+        _("Ventas exoneradas") + ":Currency:120",
         _("Base 15%") + ":Currency:140",
         _("I.S.V 15%") + ":Currency:110",
         _("Base 18%") + ":Currency:140",
@@ -51,6 +52,7 @@ def get_data(filters):
             si.posting_date,
             si.naming_series,
             si.exempt_amount,
+            si.exonerated_amount,
             si.taxed_amount_15,
             si.isv_15,
             si.taxed_amount_18,
@@ -91,6 +93,7 @@ def get_data(filters):
                 "min_no": None,
                 "max_no": None,
                 "total_exempt": 0.0,
+                "total_exonerated": 0.0,
                 "taxed_15": 0.0,
                 "isv_15": 0.0,
                 "taxed_18": 0.0,
@@ -104,6 +107,7 @@ def get_data(filters):
 
         # Acumular
         g["total_exempt"] += flt(r.get("exempt_amount"))
+        g["total_exonerated"] += flt(r.get("exonerated_amount"))
         g["taxed_15"] += flt(r.get("taxed_amount_15"))
         g["isv_15"] += flt(r.get("isv_15"))
         g["taxed_18"] += flt(r.get("taxed_amount_18"))
@@ -129,6 +133,7 @@ def get_data(filters):
                 "min_no": None,
                 "max_no": None,
                 "total_exempt": 0.0,
+                "total_exonerated": 0.0,
                 "taxed_15": 0.0,
                 "isv_15": 0.0,
                 "taxed_18": 0.0,
@@ -146,7 +151,7 @@ def get_data(filters):
             rango = format_range(g["min_no"], g["max_no"])
 
         monto_bruto = (
-            flt(g["total_exempt"]) + flt(g["taxed_15"]) + flt(g["taxed_18"]) - flt(g["discount"])
+            flt(g["total_exempt"]) + flt(g["total_exonerated"]) + flt(g["taxed_15"]) + flt(g["taxed_18"]) - flt(g["discount"])
         )
 
         row = [
@@ -154,6 +159,7 @@ def get_data(filters):
             prefix,              # Serie (del filtro)
             rango,               # Rango formateado o "-"
             g["total_exempt"],
+            g["total_exonerated"],
             g["taxed_15"],
             g["isv_15"],
             g["taxed_18"],

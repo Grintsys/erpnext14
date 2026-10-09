@@ -196,6 +196,7 @@ class SalesInvoice(SellingController):
 		self.taxed_amount_18 = 0.0
 		self.isv_18 = 0.0
 		self.exempt_amount = 0.0
+		self.exonerated_amount = 0.0
 
 		item_tax_rates = {}
 		item_tax_amounts = {}
@@ -220,6 +221,8 @@ class SalesInvoice(SellingController):
 						item_tax_amounts[item_key] = {}
 					item_tax_amounts[item_key][rate] = item_tax_amounts[item_key].get(rate, 0.0) + tax_amt
 
+		is_exonerated_party = self.tax_category in ["Exonerado", "EXONERADO"]
+
 		for item in (self.get("items") or []):
 			net_amt = flt(item.net_amount)
 
@@ -243,7 +246,9 @@ class SalesInvoice(SellingController):
 
 				rate = sum(flt(r) for r in tax_map.values())
 
-			if abs(rate - 15.0) < 0.01:
+			if is_exonerated_party:
+				self.exonerated_amount += net_amt
+			elif abs(rate - 15.0) < 0.01:
 				self.taxed_amount_15 += net_amt
 				tax_amt = item_tax_amounts.get(key, {}).get(15.0, net_amt * 0.15) if key else (net_amt * 0.15)
 				self.isv_15 += tax_amt
@@ -254,7 +259,6 @@ class SalesInvoice(SellingController):
 			elif abs(rate) < 0.01:
 				self.exempt_amount += net_amt
 
-
 		p15 = self.precision("taxed_amount_15")
 		p15 = p15 if p15 and p15 > 0 else 2
 
@@ -264,11 +268,15 @@ class SalesInvoice(SellingController):
 		p_ex = self.precision("exempt_amount")
 		p_ex = p_ex if p_ex and p_ex > 0 else 2
 
+		p_exo = self.precision("exonerated_amount")
+		p_exo = p_exo if p_exo and p_exo > 0 else 2
+
 		self.taxed_amount_15 = flt(self.taxed_amount_15, p15)
 		self.isv_15 = flt(self.isv_15, p15)
 		self.taxed_amount_18 = flt(self.taxed_amount_18, p18)
 		self.isv_18 = flt(self.isv_18, p18)
 		self.exempt_amount = flt(self.exempt_amount, p_ex)
+		self.exonerated_amount = flt(self.exonerated_amount, p_exo)
 
 
 	def validate_accounts(self):

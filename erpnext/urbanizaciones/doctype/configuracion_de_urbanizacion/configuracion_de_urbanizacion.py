@@ -1,8 +1,17 @@
 import json
 import frappe
 from frappe.model.document import Document
+from frappe.utils import cint
+
 
 class ConfiguraciondeUrbanizacion(Document):
+	def validate(self):
+		if not self.moneda_financiamiento:
+			if self.company:
+				self.moneda_financiamiento = frappe.get_cached_value("Company", self.company, "default_currency")
+			if not self.moneda_financiamiento:
+				self.moneda_financiamiento = frappe.db.get_single_value("Global Defaults", "default_currency") or "HNL"
+
 	def get_politicas_dict(self):
 		return {
 			"exigir_cobertura_mora": cint(getattr(self, "exigir_cobertura_mora", 1)),
@@ -18,6 +27,3 @@ class ConfiguraciondeUrbanizacion(Document):
 			"politica_recalculo_interes": getattr(self, "politica_recalculo_interes", "Crédito Directo Cuota Posterior") or "Crédito Directo Cuota Posterior",
 			"version_politica": str(getattr(self, "modified", "") or ""),
 		}
-
-from frappe.utils import cint
-

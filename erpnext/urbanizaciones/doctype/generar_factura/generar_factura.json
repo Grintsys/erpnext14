@@ -9,20 +9,29 @@
     "engine": "InnoDB",
     "field_order": [
         "naming_series",
+        "company",
+        "currency",
+        "currency_financiamiento",
         "customer",
         "financiamiento",
         "sales_invoice",
         "pos_profile",
         "date_quote_financing",
+        "conversion_rate",
+        "section_break_montos",
+        "total_cuota_financiamiento",
+        "total_mora_financiamiento",
+        "total_a_pagar_financiamiento",
+        "column_break_facturacion",
         "total_cuota",
         "total_mora",
         "total_a_pagar",
+        "total_facturar",
         "column_break_6dnb2",
         "monto_recibido",
         "vuelto",
         "aplicar",
         "monto_adelanto",
-        "total_facturar",
         "estado_previo_financiamiento",
         "amended_from"
     ],
@@ -36,6 +45,38 @@
             "label": "Series",
             "options": "GF-.#####",
             "reqd": 1
+        },
+        {
+            "fetch_from": "financiamiento.company",
+            "fieldname": "company",
+            "fieldtype": "Link",
+            "in_filter": 1,
+            "in_list_view": 1,
+            "in_preview": 1,
+            "in_standard_filter": 1,
+            "label": "Compañía",
+            "options": "Company",
+            "remember_last_selected_value": 1,
+            "reqd": 1
+        },
+        {
+            "fieldname": "currency",
+            "fieldtype": "Link",
+            "in_filter": 1,
+            "in_list_view": 1,
+            "in_preview": 1,
+            "in_standard_filter": 1,
+            "label": "Moneda de Facturación",
+            "options": "Currency",
+            "read_only": 1
+        },
+        {
+            "fetch_from": "financiamiento.currency",
+            "fieldname": "currency_financiamiento",
+            "fieldtype": "Link",
+            "label": "Moneda de Financiamiento",
+            "options": "Currency",
+            "read_only": 1
         },
         {
             "fieldname": "amended_from",
@@ -72,10 +113,11 @@
             "read_only": 1
         },
         {
-            "fieldname": "total_cuota",
-            "fieldtype": "Currency",
-            "label": "Total cuota",
-            "read_only": 1
+            "fieldname": "pos_profile",
+            "fieldtype": "Link",
+            "label": "Perfil POS",
+            "options": "POS Profile",
+            "reqd": 1
         },
         {
             "fieldname": "date_quote_financing",
@@ -84,33 +126,87 @@
             "read_only": 1
         },
         {
-            "fieldname": "total_mora",
-            "fieldtype": "Currency",
-            "label": "Total Mora",
+            "default": "1",
+            "description": "Factor de cambio oficial obtenido de Currency Exchange. No editable por el cajero.",
+            "fieldname": "conversion_rate",
+            "fieldtype": "Float",
+            "label": "Factor de Cambio",
+            "precision": "4",
             "read_only": 1
         },
         {
-            "fieldname": "pos_profile",
-            "fieldtype": "Link",
-            "label": "Perfil POS",
-            "options": "POS Profile",
-            "reqd": 1
+            "fieldname": "section_break_montos",
+            "fieldtype": "Section Break",
+            "label": "Desglose de Montos y Cobro"
+        },
+        {
+            "fieldname": "total_cuota_financiamiento",
+            "fieldtype": "Currency",
+            "label": "Cuota (Moneda Finan.)",
+            "options": "currency_financiamiento",
+            "read_only": 1
+        },
+        {
+            "fieldname": "total_mora_financiamiento",
+            "fieldtype": "Currency",
+            "label": "Mora (Moneda Finan.)",
+            "options": "currency_financiamiento",
+            "read_only": 1
+        },
+        {
+            "fieldname": "total_a_pagar_financiamiento",
+            "fieldtype": "Currency",
+            "label": "Total a Pagar (Moneda Finan.)",
+            "options": "currency_financiamiento",
+            "read_only": 1
+        },
+        {
+            "fieldname": "column_break_facturacion",
+            "fieldtype": "Column Break"
+        },
+        {
+            "fieldname": "total_cuota",
+            "fieldtype": "Currency",
+            "label": "Total cuota",
+            "options": "currency",
+            "read_only": 1
+        },
+        {
+            "fieldname": "total_mora",
+            "fieldtype": "Currency",
+            "label": "Total Mora",
+            "options": "currency",
+            "read_only": 1
         },
         {
             "fieldname": "total_a_pagar",
             "fieldtype": "Currency",
             "label": "Total a pagar",
+            "options": "currency",
             "read_only": 1
+        },
+        {
+            "fieldname": "total_facturar",
+            "fieldtype": "Currency",
+            "label": "Total a facturar",
+            "options": "currency",
+            "read_only": 1
+        },
+        {
+            "fieldname": "column_break_6dnb2",
+            "fieldtype": "Column Break"
         },
         {
             "fieldname": "monto_recibido",
             "fieldtype": "Currency",
-            "label": "Monto recibido"
+            "label": "Monto recibido",
+            "options": "currency"
         },
         {
             "fieldname": "vuelto",
             "fieldtype": "Currency",
             "label": "Diferencia",
+            "options": "currency",
             "read_only": 1
         },
         {
@@ -123,17 +219,8 @@
             "fieldname": "monto_adelanto",
             "fieldtype": "Currency",
             "label": "Monto de adelanto",
+            "options": "currency",
             "read_only": 1
-        },
-        {
-            "fieldname": "total_facturar",
-            "fieldtype": "Currency",
-            "label": "Total a facturar",
-            "read_only": 1
-        },
-        {
-            "fieldname": "column_break_6dnb2",
-            "fieldtype": "Column Break"
         },
         {
             "fieldname": "estado_previo_financiamiento",
