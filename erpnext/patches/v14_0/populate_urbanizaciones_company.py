@@ -2,6 +2,9 @@ import frappe
 
 
 def execute():
+	if not frappe.db.table_exists("Financiamientos") or not frappe.db.table_exists("Urbanizaciones"):
+		return
+
 	default_company = frappe.defaults.get_user_default("Company") or frappe.db.get_single_value(
 		"Global Defaults", "default_company"
 	)
