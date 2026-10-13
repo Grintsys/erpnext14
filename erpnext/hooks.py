@@ -656,7 +656,7 @@ extend_bootinfo = [
 fields_for_group_similar_items = ["qty", "amount"]
 
 after_migrate = [
-	"erpnext.accounts.doctype.tax_category.tax_category.create_default_tax_categories",
+	"erpnext.accounts.doctype.tax_category.tax_category.setup_standard_sales_tax_templates",
 ]
 
 

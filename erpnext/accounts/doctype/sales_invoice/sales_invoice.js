@@ -743,6 +743,26 @@ frappe.ui.form.on('Sales Invoice', {
 			})
 		}
 	},
+	tax_category: function(frm) {
+		if (frm.doc.customer && frm.doc.company) {
+			frappe.call({
+				method: "erpnext.accounts.party.set_taxes",
+				args: {
+					party: frm.doc.customer,
+					party_type: "Customer",
+					posting_date: frm.doc.posting_date,
+					company: frm.doc.company,
+					tax_category: frm.doc.tax_category
+				},
+				callback: function(r) {
+					if (r.message) {
+						frm.set_value("taxes_and_charges", r.message);
+					}
+				}
+			});
+		}
+		consolidate_honduras_totals(frm);
+	},
 
 	onload: function(frm) {
 		frm.redemption_conversion_factor = null;
