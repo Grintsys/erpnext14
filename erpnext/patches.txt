@@ -368,4 +368,5 @@ erpnext.patches.v14_0.remove_cancelled_asset_capitalization_from_asset
 erpnext.patches.v14_0.enable_set_priority_for_pricing_rules #1
 erpnext.patches.v14_0.update_currency_exchange_settings_for_frankfurter
 erpnext.patches.v14_0.populate_urbanizaciones_company
+erpnext.patches.v14_0.create_default_tax_categories
 
