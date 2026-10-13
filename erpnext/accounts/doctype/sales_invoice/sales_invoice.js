@@ -743,6 +743,24 @@ frappe.ui.form.on('Sales Invoice', {
 			})
 		}
 	},
+	customer: function(frm) {
+		if (!frm.doc.customer) return;
+		frappe.db.get_value("Customer", frm.doc.customer,
+			["tax_category", "custom_subtipo_exonerado", "custom_constancia_exonerado", "custom_carnet_diplomatico"],
+			function(r) {
+				if (r) {
+					if (r.tax_category) {
+						frm.set_value("tax_category", r.tax_category);
+					}
+					frm.set_value("custom_subtipo_exonerado", r.custom_subtipo_exonerado || "");
+					frm.set_value("custom_constancia_exonerado", r.custom_constancia_exonerado || "");
+					frm.set_value("custom_carnet_diplomatico", r.custom_carnet_diplomatico || "");
+					adjust_exonerated_rates(frm);
+				}
+			}
+		);
+	},
+
 	tax_category: function(frm) {
 		if (frm.doc.customer && frm.doc.company) {
 			frappe.call({
@@ -761,7 +779,31 @@ frappe.ui.form.on('Sales Invoice', {
 				}
 			});
 		}
+		adjust_exonerated_rates(frm);
 		consolidate_honduras_totals(frm);
+	},
+
+	validate: function(frm) {
+		adjust_exonerated_rates(frm);
+		if (frm.doc.tax_category === "Exonerado" || frm.doc.tax_category === "EXONERADO") {
+			if (frm.doc.custom_subtipo_exonerado === "Constancia SAR / SAG / SEFIN") {
+				if (!frm.doc.custom_orden_compra_exenta) {
+					frappe.msgprint({
+						title: __("Validación SAR Honduras"),
+						message: __("Para clientes con Constancia SAR/SAG, es obligatorio ingresar el No. de Orden de Compra Exenta."),
+						indicator: "orange"
+					});
+				}
+			} else if (frm.doc.custom_subtipo_exonerado === "Diplomático / Misión Internacional") {
+				if (!frm.doc.custom_carnet_diplomatico) {
+					frappe.msgprint({
+						title: __("Validación SAR Honduras"),
+						message: __("Para Diplomáticos / Misiones, es obligatorio ingresar el No. de Carnet Diplomático."),
+						indicator: "orange"
+					});
+				}
+			}
+		}
 	},
 
 	onload: function(frm) {
@@ -1013,6 +1055,47 @@ frappe.ui.form.on('Sales Invoice', {
 	}
 });
 
+var adjust_exonerated_rates = function(frm) {
+	if (!frm || !frm.doc) return;
+	let is_exonerated = (frm.doc.tax_category === "Exonerado" || frm.doc.tax_category === "EXONERADO");
+
+	let items_changed = false;
+	(frm.doc.items || []).forEach(function(item) {
+		let price_list_rate = flt(item.price_list_rate);
+		if (!price_list_rate) return;
+		if (item.discount_percentage && flt(item.discount_percentage) > 0) return;
+
+		let divisor = 1.15;
+		let tpl = (item.item_tax_template || "").toUpperCase();
+		if (tpl.indexOf("18") !== -1) {
+			divisor = 1.18;
+		} else if (tpl.indexOf("EXENTO") !== -1) {
+			divisor = 1.0;
+		}
+
+		if (divisor === 1.0) return;
+
+		let p = precision("rate", item) || 2;
+		let net_rate = flt(price_list_rate / divisor, p);
+
+		if (is_exonerated) {
+			if (Math.abs(flt(item.rate) - price_list_rate) < 0.02) {
+				frappe.model.set_value(item.doctype, item.name, "rate", net_rate);
+				items_changed = true;
+			}
+		} else {
+			if (Math.abs(flt(item.rate) - net_rate) < 0.02) {
+				frappe.model.set_value(item.doctype, item.name, "rate", price_list_rate);
+				items_changed = true;
+			}
+		}
+	});
+
+	if (items_changed) {
+		frm.refresh_field("items");
+	}
+};
+
 var consolidate_honduras_totals = function(frm) {
 	if (!frm || !frm.doc) return;
 
@@ -1119,6 +1202,15 @@ var consolidate_honduras_totals = function(frm) {
 	frm.refresh_field("exempt_amount");
 	frm.refresh_field("exonerated_amount");
 };
+
+
+frappe.ui.form.on("Sales Invoice Item", {
+	item_code: function(frm, cdt, cdn) {
+		setTimeout(function() {
+			adjust_exonerated_rates(frm);
+		}, 600);
+	}
+});
 
 
 frappe.ui.form.on("Sales Invoice Timesheet", {

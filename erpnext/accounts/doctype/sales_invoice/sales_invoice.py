@@ -100,7 +100,57 @@ class SalesInvoice(SellingController):
 					if total_sum == self.rounded_total:
 						self.outstanding_amount = 0
 
+	def before_validate(self):
+		if hasattr(super(), "before_validate"):
+			super().before_validate()
+		self.adjust_exonerated_rates_and_validate_sar()
+
+	def adjust_exonerated_rates_and_validate_sar(self):
+		is_exonerated = self.tax_category in ["Exonerado", "EXONERADO"]
+		for item in (self.get("items") or []):
+			if not item.price_list_rate or flt(item.discount_percentage):
+				continue
+
+			divisor = 1.15
+			tpl = (item.item_tax_template or "").upper()
+			if "18" in tpl:
+				divisor = 1.18
+			elif "EXENTO" in tpl:
+				divisor = 1.0
+
+			if divisor == 1.0:
+				continue
+
+			p = item.precision("rate") or 2
+			net_rate = flt(round(flt(item.price_list_rate) / divisor, p), p)
+
+			if is_exonerated:
+				if abs(flt(item.rate) - flt(item.price_list_rate)) < 0.02:
+					item.rate = net_rate
+					item.amount = flt(round(flt(item.rate) * flt(item.qty or 1), 2), 2)
+			else:
+				if abs(flt(item.rate) - net_rate) < 0.02:
+					item.rate = flt(item.price_list_rate, p)
+					item.amount = flt(round(flt(item.rate) * flt(item.qty or 1), 2), 2)
+
+		if is_exonerated and self.docstatus == 1:
+			if getattr(self, "custom_subtipo_exonerado", None) == "Constancia SAR / SAG / SEFIN":
+				if not getattr(self, "custom_orden_compra_exenta", None):
+					frappe.throw(
+						_("SAR Honduras: Para emitir una factura exonerada con Constancia SAR/SAG, es obligatorio registrar el No. de Orden de Compra Exenta.")
+					)
+				if not getattr(self, "custom_constancia_exonerado", None):
+					frappe.throw(
+						_("SAR Honduras: Debe especificar el No. de Constancia de Registro de Exonerados.")
+					)
+			elif getattr(self, "custom_subtipo_exonerado", None) == "Diplomático / Misión Internacional":
+				if not getattr(self, "custom_carnet_diplomatico", None):
+					frappe.throw(
+						_("SAR Honduras: Debe registrar el No. de Carnet Diplomático o de Misión Internacional.")
+					)
+
 	def validate(self):
+		self.adjust_exonerated_rates_and_validate_sar()
 		super().validate()
 		self.validate_auto_set_posting_time()
 

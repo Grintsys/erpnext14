@@ -1,5 +1,6 @@
 import frappe
 from frappe.model.document import Document
+from frappe.utils import flt
 
 
 class TaxCategory(Document):
@@ -65,7 +66,8 @@ def cleanup_accidental_naming_series_property_setters():
 
 def setup_standard_sales_tax_templates(company=None):
 	"""
-	Estandariza las 4 plantillas de impuestos sobre ventas (Honduras) y sus Tax Rules:
+	Estandariza las 4 plantillas de impuestos sobre ventas (Honduras),
+	las 3 plantillas de impuestos por producto (Item Tax Templates) y sus Tax Rules:
 	1. ISV 15% (Por defecto)
 	2. ISV 18%
 	3. Exento
@@ -113,7 +115,7 @@ def setup_standard_sales_tax_templates(company=None):
 		acc_exo = get_or_create_tax_account("Débito Fiscal ISV Exonerado 0%", tax_group)
 		acc_exento = get_or_create_tax_account("Débito Fiscal ISV Exento 0%", tax_group)
 
-		# 4 Plantillas estándar
+		# 4 Plantillas estándar de Ventas
 		templates_data = [
 			{
 				"title": "ISV 15%",
@@ -223,4 +225,76 @@ def setup_standard_sales_tax_templates(company=None):
 				rule.insert()
 			else:
 				frappe.db.set_value("Tax Rule", existing_rule, "sales_tax_template", r_cfg["template"])
+
+		# Estandarizar Item Tax Templates (ISV15%, ISV18%, EXENTO)
+		item_templates_data = [
+			{"title": "ISV15%", "account": acc_15, "rate": 15.0},
+			{"title": "ISV18%", "account": acc_18, "rate": 18.0},
+			{"title": "EXENTO", "account": acc_exento, "rate": 0.0},
+		]
+
+		for it_data in item_templates_data:
+			existing_it = frappe.db.get_value(
+				"Item Tax Template",
+				{"company": comp, "title": it_data["title"]},
+				"name"
+			)
+			if not existing_it:
+				existing_it = frappe.db.get_value(
+					"Item Tax Template",
+					{"name": ["in", [it_data["title"], f"{it_data['title']} - {abbr}"]]},
+					"name"
+				)
+
+			if not existing_it:
+				it_doc = frappe.get_doc({
+					"doctype": "Item Tax Template",
+					"title": it_data["title"],
+					"company": comp,
+					"taxes": [
+						{
+							"tax_type": it_data["account"],
+							"tax_rate": it_data["rate"]
+						}
+					]
+				})
+				it_doc.flags.ignore_permissions = True
+				it_doc.insert()
+			else:
+				tax_detail = frappe.db.get_value(
+					"Item Tax Template Detail",
+					{"parent": existing_it},
+					["name", "tax_type", "tax_rate"],
+					as_dict=True
+				)
+				if not tax_detail:
+					frappe.get_doc({
+						"doctype": "Item Tax Template Detail",
+						"parent": existing_it,
+						"parenttype": "Item Tax Template",
+						"parentfield": "taxes",
+						"tax_type": it_data["account"],
+						"tax_rate": it_data["rate"]
+					}).insert(ignore_permissions=True)
+				elif abs(flt(tax_detail.tax_rate) - it_data["rate"]) > 0.01:
+					frappe.db.set_value("Item Tax Template Detail", tax_detail.name, "tax_rate", it_data["rate"])
+
+	# Desactivar scripts antiguos de base de datos para que la lógica corra exclusivamente en código nativo versionado
+	if frappe.db.table_exists("Client Script"):
+		frappe.db.sql(
+			"""
+			UPDATE `tabClient Script`
+			SET enabled = 0
+			WHERE name = 'SAR Exoneracion - Sales Invoice Handler'
+			"""
+		)
+	if frappe.db.table_exists("Server Script"):
+		frappe.db.sql(
+			"""
+			UPDATE `tabServer Script`
+			SET disabled = 1
+			WHERE name = 'SAR Exoneracion - Sales Invoice Server Logic'
+			"""
+		)
+	frappe.db.commit()
 
