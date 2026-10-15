@@ -1,0 +1,319 @@
+{
+ "actions": [],
+ "allow_import": 1,
+ "allow_rename": 1,
+ "autoname": "naming_series:",
+ "creation": "2026-10-14 22:50:00.000000",
+ "default_view": "List",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_1",
+  "naming_series",
+  "company",
+  "currency",
+  "column_break_1",
+  "customer",
+  "urbanizaciones",
+  "centro_costo",
+  "column_break_2",
+  "activos",
+  "fecha_inicio",
+  "status",
+  "financiamiento_creado",
+  "section_break_financiero",
+  "configuracion_financiamiento",
+  "monto_contrato",
+  "prima",
+  "capital_financiado",
+  "column_break_3",
+  "plazo_meses",
+  "interes_anual",
+  "dia_vencimiento_cuota",
+  "mora_diaria",
+  "section_break_resumen",
+  "cuota_estimada",
+  "total_financiado",
+  "column_break_4",
+  "total_capital_cuotas",
+  "saldo_actual",
+  "cuotas_pagadas_count",
+  "tab_break_cuotas",
+  "cuotas"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_1",
+   "fieldtype": "Section Break",
+   "label": "Informaci\u00f3n General"
+  },
+  {
+   "default": "HFIN-.#####",
+   "fieldname": "naming_series",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Series",
+   "options": "HFIN-.#####",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Compa\u00f1\u00eda",
+   "options": "Company",
+   "remember_last_selected_value": 1,
+   "reqd": 1
+  },
+  {
+   "default": "HNL",
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Moneda",
+   "options": "Currency",
+   "remember_last_selected_value": 1,
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_1",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Cliente",
+   "options": "Customer",
+   "reqd": 1
+  },
+  {
+   "fieldname": "urbanizaciones",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "in_standard_filter": 1,
+   "label": "Urbanizaci\u00f3n / Proyecto",
+   "options": "Urbanizaciones",
+   "reqd": 1
+  },
+  {
+   "fieldname": "centro_costo",
+   "fieldtype": "Link",
+   "label": "Centro de Costo",
+   "options": "Cost Center",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_2",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "activos",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Activo / Lote",
+   "options": "Activos",
+   "reqd": 1
+  },
+  {
+   "fieldname": "fecha_inicio",
+   "fieldtype": "Date",
+   "label": "Fecha de Inicio / Contrato",
+   "reqd": 1
+  },
+  {
+   "default": "Borrador",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Estado de Migraci\u00f3n",
+   "options": "Borrador\nMigrado\nCancelado",
+   "read_only": 1
+  },
+  {
+   "fieldname": "financiamiento_creado",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Financiamiento Creado",
+   "options": "Financiamientos",
+   "read_only": 1
+  },
+  {
+   "fieldname": "section_break_financiero",
+   "fieldtype": "Section Break",
+   "label": "Condiciones del Financiamiento"
+  },
+  {
+   "fieldname": "configuracion_financiamiento",
+   "fieldtype": "Link",
+   "label": "Configuraci\u00f3n de Financiamiento",
+   "options": "Configuracion de Urbanizacion",
+   "reqd": 1
+  },
+  {
+   "fieldname": "monto_contrato",
+   "fieldtype": "Currency",
+   "label": "Valor Total / Contado",
+   "reqd": 1
+  },
+  {
+   "fieldname": "prima",
+   "fieldtype": "Currency",
+   "label": "Prima",
+   "reqd": 1
+  },
+  {
+   "fieldname": "capital_financiado",
+   "fieldtype": "Currency",
+   "label": "Capital Financiado",
+   "precision": "2",
+   "reqd": 1
+  },
+  {
+   "fieldname": "column_break_3",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "plazo_meses",
+   "fieldtype": "Int",
+   "label": "Plazo en Meses",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fetch_from": "configuracion_financiamiento.interes_anual",
+   "fieldname": "interes_anual",
+   "fieldtype": "Percent",
+   "label": "Inter\u00e9s Anual (%)",
+   "precision": "2"
+  },
+  {
+   "default": "5",
+   "fetch_from": "configuracion_financiamiento.vencimiento_cuota",
+   "fieldname": "dia_vencimiento_cuota",
+   "fieldtype": "Int",
+   "label": "D\u00eda de Vencimiento",
+   "reqd": 1
+  },
+  {
+   "default": "0",
+   "fetch_from": "configuracion_financiamiento.mora_diaria",
+   "fieldname": "mora_diaria",
+   "fieldtype": "Percent",
+   "label": "Mora Diaria (%)",
+   "precision": "2"
+  },
+  {
+   "fieldname": "section_break_resumen",
+   "fieldtype": "Section Break",
+   "label": "Totales y Conciliaci\u00f3n"
+  },
+  {
+   "fieldname": "cuota_estimada",
+   "fieldtype": "Currency",
+   "label": "Cuota Estimada Mensual",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_financiado",
+   "fieldtype": "Currency",
+   "label": "Total Financiado (Capital + Intereses)",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "column_break_4",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "total_capital_cuotas",
+   "fieldtype": "Currency",
+   "label": "Suma de Capital en Cuotas",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "fieldname": "saldo_actual",
+   "fieldtype": "Currency",
+   "label": "Saldo Pendiente Restante",
+   "precision": "2",
+   "read_only": 1
+  },
+  {
+   "default": "0",
+   "fieldname": "cuotas_pagadas_count",
+   "fieldtype": "Int",
+   "label": "Cuotas Marcadas como Pagadas",
+   "read_only": 1
+  },
+  {
+   "fieldname": "tab_break_cuotas",
+   "fieldtype": "Tab Break",
+   "label": "Plan de Pagos"
+  },
+  {
+   "description": "Tabla editable del plan de amortizaci\u00f3n. Puede generar el plan base y luego ajustar celdas (capital, saldo, estado pagado) id\u00e9ntico a su Excel.",
+   "fieldname": "cuotas",
+   "fieldtype": "Table",
+   "label": "Cuotas de Amortizaci\u00f3n",
+   "options": "Historico Cuota Financiamiento"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2026-10-14 22:50:00.000000",
+ "modified_by": "Administrator",
+ "module": "Urbanizaciones",
+ "name": "Historico Financiamiento",
+ "naming_rule": "By \"Naming Series\" field",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts Manager",
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Accounts User",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "search_fields": "customer, urbanizaciones, activos",
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": [],
+ "track_changes": 1
+}
