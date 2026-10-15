@@ -26,17 +26,48 @@ frappe.ui.form.on("Historico Financiamiento", {
 
 			if (frm.doc.cuotas && frm.doc.cuotas.length > 0) {
 				frm.add_custom_button(__("Recalcular Saldos en Cadena"), function() {
-					let prev_balance = flt(frm.doc.capital_financiado);
-					(frm.doc.cuotas || []).forEach(function(row) {
-						frappe.model.set_value(row.doctype, row.name, "saldo_anterior", prev_balance);
-						let cap = flt(row.capital);
-						let nuevo_saldo = prev_balance - cap;
-						if (nuevo_saldo < 0) nuevo_saldo = 0.0;
-						frappe.model.set_value(row.doctype, row.name, "saldo", nuevo_saldo);
-						prev_balance = nuevo_saldo;
+					frappe.call({
+						method: "erpnext.urbanizaciones.doctype.historico_financiamiento.historico_financiamiento.recalcular_cadena_saldos",
+						args: {
+							docname: frm.doc.name,
+							auto_ajustar_residuo: 1
+						},
+						freeze: true,
+						freeze_message: __("Recalculando saldos y conciliando residuo final..."),
+						callback: function(r) {
+							if (r.message && r.message.success) {
+								let msg = __("Saldos recalculados en cadena correctamente.");
+								if (r.message.residuo_absorbido) {
+									msg += __(" Se absorbió residuo de L {0} en la última cuota.", [r.message.residuo_absorbido]);
+								}
+								frappe.show_alert({ message: msg, indicator: "green" });
+								frm.reload_doc();
+							}
+						}
 					});
-					frm.refresh_field("cuotas");
-					frappe.show_alert({ message: __("Saldos recalculados en cadena."), indicator: "blue" });
+				}, __("Acciones"));
+
+				frm.add_custom_button(__("Reamortizar Cuotas Pendientes"), function() {
+					frappe.confirm(
+						__("¿Desea reamortizar automáticamente las cuotas pendientes con la cuota fija a partir del saldo actual post-abonos?"),
+						function() {
+							frappe.call({
+								method: "erpnext.urbanizaciones.doctype.historico_financiamiento.historico_financiamiento.reamortizar_cuotas_pendientes",
+								args: { docname: frm.doc.name },
+								freeze: true,
+								freeze_message: __("Reamortizando cuotas pendientes..."),
+								callback: function(r) {
+									if (r.message && r.message.success) {
+										frappe.show_alert({
+											message: __("Cuotas pendientes reamortizadas correctamente."),
+											indicator: "green"
+										});
+										frm.reload_doc();
+									}
+								}
+							});
+						}
+					);
 				}, __("Acciones"));
 
 				frm.add_custom_button(__("Validar y Crear Financiamiento"), function() {
@@ -114,6 +145,10 @@ frappe.ui.form.on("Historico Cuota Financiamiento", {
 
 	status: function(frm, cdt, cdn) {
 		actualizar_resumen(frm);
+	},
+
+	abono_capital: function(frm, cdt, cdn) {
+		actualizar_resumen(frm);
 	}
 });
 
@@ -124,7 +159,8 @@ function actualizar_resumen(frm) {
 
 	(frm.doc.cuotas || []).forEach(function(row) {
 		total_cap += flt(row.capital);
-		if (row.status === "Pagado" || row.status === "Anticipada") {
+		let is_paid = row.status === "Pagado" || row.status === "Anticipada" || row.status === "Abono a capital" || row.abono_capital;
+		if (is_paid) {
 			pagadas++;
 		} else if (row.status === "Pendiente") {
 			pendiente += flt(row.total_cuota);

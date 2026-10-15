@@ -33,7 +33,8 @@ class HistoricoFinanciamiento(Document):
 
 		for c in cuotas:
 			total_cap += flt(c.capital)
-			if c.status in ("Pagado", "Anticipada"):
+			is_paid = c.status in ("Pagado", "Anticipada", "Abono a capital") or getattr(c, "abono_capital", 0)
+			if is_paid:
 				pagadas += 1
 			elif c.status == "Pendiente":
 				total_saldo_pend += flt(c.total_cuota)
@@ -137,6 +138,155 @@ def generar_cuotas(docname):
 
 
 @frappe.whitelist()
+def recalcular_cadena_saldos(docname, auto_ajustar_residuo=1):
+	"""
+	Recalcula la corrida completa de saldos (saldo_anterior y saldo) a lo largo
+	de toda la tabla a partir del capital financiado y los capitales ingresados.
+	- Si una cuota fue modificada con abonos o capitales atípicos, recalcula
+	  la cascada hacia abajo.
+	- Si auto_ajustar_residuo=1 y existe un descuadre menor (<= L 100), ajusta
+	  la última cuota para absorber el residuo y garantizar saldo final exacto en 0.00.
+	- Persiste los cambios en la base de datos y recalcula los totales.
+	"""
+	doc = frappe.get_doc("Historico Financiamiento", docname)
+
+	if doc.status == "Migrado":
+		frappe.throw(_("Este histórico ya fue migrado a {0} y no puede modificarse.").format(doc.financiamiento_creado))
+
+	if not doc.cuotas:
+		frappe.throw(_("No hay cuotas para recalcular."))
+
+	getcontext().prec = 28
+	CENT = Decimal("0.01")
+
+	prev_balance = Decimal(str(doc.capital_financiado or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+
+	for c in doc.cuotas:
+		c.saldo_anterior = float(prev_balance)
+		cap = Decimal(str(c.capital or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+		nuevo_saldo = (prev_balance - cap).quantize(CENT, rounding=ROUND_HALF_UP)
+		if nuevo_saldo < Decimal("0.00"):
+			nuevo_saldo = Decimal("0.00")
+		c.saldo = float(nuevo_saldo)
+		prev_balance = nuevo_saldo
+
+	# Validar diferencia con el capital financiado
+	capital_esperado = Decimal(str(doc.capital_financiado or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+	total_cap_cuotas = sum(Decimal(str(c.capital or 0)) for c in doc.cuotas).quantize(CENT, rounding=ROUND_HALF_UP)
+	diff_capital = (total_cap_cuotas - capital_esperado).quantize(CENT, rounding=ROUND_HALF_UP)
+
+	residuo_absorbido = 0.0
+	if abs(diff_capital) > Decimal("0.00"):
+		if int(auto_ajustar_residuo) and abs(diff_capital) <= Decimal("100.00"):
+			last_row = doc.cuotas[-1]
+			nuevo_cap_last = (Decimal(str(last_row.capital or 0)) - diff_capital).quantize(CENT, rounding=ROUND_HALF_UP)
+			last_row.capital = float(nuevo_cap_last)
+			last_row.total_cuota = float((nuevo_cap_last + Decimal(str(last_row.intereses or 0))).quantize(CENT, rounding=ROUND_HALF_UP))
+			last_row.saldo = 0.0
+			residuo_absorbido = float(diff_capital)
+		else:
+			frappe.msgprint(
+				_(
+					"Aviso: La suma de capitales de las cuotas ({0}) difiere del capital financiado ({1}) por {2}."
+				).format(float(total_cap_cuotas), float(capital_esperado), float(diff_capital)),
+				indicator="orange"
+			)
+
+	if doc.cuotas:
+		doc.cuotas[-1].saldo = 0.0
+
+	doc.recalcular_totales_internos()
+	doc.save(ignore_permissions=True)
+
+	return {
+		"success": True,
+		"cuotas_pagadas": doc.cuotas_pagadas_count,
+		"saldo_actual": doc.saldo_actual,
+		"total_capital_cuotas": doc.total_capital_cuotas,
+		"residuo_absorbido": residuo_absorbido,
+		"diff_capital": float(diff_capital),
+	}
+
+
+@frappe.whitelist()
+def reamortizar_cuotas_pendientes(docname):
+	"""
+	Reamortiza únicamente las cuotas que están en estado 'Pendiente' utilizando
+	el saldo real tras los abonos y cuotas pagadas/históricas, manteniendo
+	el valor de la cuota mensual fija (método reducir plazo).
+	"""
+	doc = frappe.get_doc("Historico Financiamiento", docname)
+
+	if doc.status == "Migrado":
+		frappe.throw(_("Este histórico ya fue migrado a {0}.").format(doc.financiamiento_creado))
+
+	cuotas_pend = [c for c in doc.cuotas if c.status == "Pendiente" and not getattr(c, "abono_capital", 0)]
+	if not cuotas_pend:
+		frappe.throw(_("No hay cuotas pendientes para reamortizar."))
+
+	first_idx = cuotas_pend[0].idx - 1
+	if first_idx > 0:
+		base_balance = Decimal(str(doc.cuotas[first_idx - 1].saldo or 0))
+	else:
+		base_balance = Decimal(str(doc.capital_financiado or 0))
+
+	if base_balance <= 0:
+		frappe.throw(_("El saldo restante ya es 0."))
+
+	getcontext().prec = 28
+	CENT = Decimal("0.01")
+
+	annual_interest = Decimal(str(doc.interes_anual or 0))
+	r = (annual_interest / Decimal("100")) / Decimal("12") if annual_interest != 0 else Decimal("0")
+	fixed_pmt = Decimal(str(doc.cuota_estimada or cuotas_pend[0].total_cuota or 0))
+
+	curr_balance = base_balance
+
+	for c in cuotas_pend:
+		if curr_balance <= Decimal("0.00"):
+			c.saldo_anterior = 0.0
+			c.capital = 0.0
+			c.intereses = 0.0
+			c.total_cuota = 0.0
+			c.saldo = 0.0
+			c.status = "Anticipada"
+			c.notas = "Cancelada anticipadamente por abonos a capital históricos."
+			continue
+
+		interest = (curr_balance * r).quantize(CENT, rounding=ROUND_HALF_UP)
+		principal = (fixed_pmt - interest).quantize(CENT, rounding=ROUND_HALF_UP)
+
+		if principal >= curr_balance:
+			principal = curr_balance
+			this_payment = (principal + interest).quantize(CENT, rounding=ROUND_HALF_UP)
+			prev_b = curr_balance
+			curr_balance = Decimal("0.00")
+			c.saldo_anterior = float(prev_b)
+			c.capital = float(principal)
+			c.intereses = float(interest)
+			c.total_cuota = float(this_payment)
+			c.saldo = 0.0
+		else:
+			this_payment = fixed_pmt
+			prev_b = curr_balance
+			curr_balance = (curr_balance - principal).quantize(CENT, rounding=ROUND_HALF_UP)
+			c.saldo_anterior = float(prev_b)
+			c.capital = float(principal)
+			c.intereses = float(interest)
+			c.total_cuota = float(this_payment)
+			c.saldo = float(curr_balance)
+
+	doc.recalcular_totales_internos()
+	doc.save(ignore_permissions=True)
+
+	return {
+		"success": True,
+		"cuotas_pagadas": doc.cuotas_pagadas_count,
+		"saldo_actual": doc.saldo_actual,
+	}
+
+
+@frappe.whitelist()
 def validar_y_crear_financiamiento(docname, auto_ajustar_residuo=1):
 	"""
 	Valida las cuotas cargadas/modificadas y crea el DocType Financiamientos oficial.
@@ -218,14 +368,18 @@ def validar_y_crear_financiamiento(docname, auto_ajustar_residuo=1):
 
 	for c in doc.cuotas:
 		st = c.status or "Pendiente"
-		if st in ("Pagado", "Anticipada"):
+		is_paid = st in ("Pagado", "Anticipada", "Abono a capital") or getattr(c, "abono_capital", 0)
+		if is_paid:
 			cuotas_pagadas += 1
-			nota_row = c.notas or f"Pago histórico migrado de Excel (Cuota #{c.numero_cuota})."
+			extra_tag = " - Abono a capital" if (st == "Abono a capital" or getattr(c, "abono_capital", 0)) else ""
+			nota_row = c.notas or f"Pago histórico migrado de Excel (Cuota #{c.numero_cuota}{extra_tag})."
+			status_real = st if st in ("Pagado", "Anticipada") else "Pagado"
 		else:
 			saldo_pendiente += flt(c.total_cuota)
 			if not primera_fecha_pendiente:
 				primera_fecha_pendiente = c.fecha_vencimiento_cuota
 			nota_row = c.notas
+			status_real = "Pendiente"
 
 		fin_doc.append(
 			"cuotas",
@@ -238,7 +392,7 @@ def validar_y_crear_financiamiento(docname, auto_ajustar_residuo=1):
 				"intereses": c.intereses,
 				"total_cuota": c.total_cuota,
 				"saldo": c.saldo,
-				"status": st,
+				"status": status_real,
 				"mora": flt(c.mora or 0),
 				"notas": nota_row,
 				"monto_adelantado": 0.0,
