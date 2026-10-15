@@ -25,7 +25,7 @@ frappe.ui.form.on("Historico Financiamiento", {
 			}, __("Acciones"));
 
 			if (frm.doc.cuotas && frm.doc.cuotas.length > 0) {
-				frm.add_custom_button(__("Recalcular Saldos en Cadena"), function() {
+				let recalcular_fn = function() {
 					frappe.call({
 						method: "erpnext.urbanizaciones.doctype.historico_financiamiento.historico_financiamiento.recalcular_cadena_saldos",
 						args: {
@@ -45,6 +45,41 @@ frappe.ui.form.on("Historico Financiamiento", {
 							}
 						}
 					});
+				};
+
+				frm.add_custom_button(__("Recalcular Saldos y Conciliar"), recalcular_fn);
+				frm.add_custom_button(__("Recalcular Saldos en Cadena"), recalcular_fn, __("Acciones"));
+
+				frm.add_custom_button(__("Marcar Cuotas 1 a N Pagadas"), function() {
+					frappe.prompt(
+						[
+							{
+								label: __("Marcar como Pagadas hasta la cuota número"),
+								fieldname: "hasta_cuota",
+								fieldtype: "Int",
+								reqd: 1,
+								default: frm.doc.cuotas_pagadas_count || 11
+							}
+						],
+						function(vals) {
+							let max_c = vals.hasta_cuota;
+							(frm.doc.cuotas || []).forEach(function(row) {
+								if (row.numero_cuota <= max_c) {
+									if (row.status === "Pendiente") {
+										row.status = "Pagado";
+									}
+								} else {
+									if (row.status === "Pagado") {
+										row.status = "Pendiente";
+									}
+								}
+							});
+							recalcular_saldos_cliente(frm);
+							frm.save();
+						},
+						__("Marcar Cuotas Históricas Pagadas"),
+						__("Aplicar")
+					);
 				}, __("Acciones"));
 
 				frm.add_custom_button(__("Reamortizar Cuotas Pendientes"), function() {
@@ -134,13 +169,25 @@ frappe.ui.form.on("Historico Cuota Financiamiento", {
 	capital: function(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
 		frappe.model.set_value(cdt, cdn, "total_cuota", flt(flt(row.capital) + flt(row.intereses), 2));
-		actualizar_resumen(frm);
+		recalcular_saldos_cliente(frm);
 	},
 
 	intereses: function(frm, cdt, cdn) {
 		let row = locals[cdt][cdn];
 		frappe.model.set_value(cdt, cdn, "total_cuota", flt(flt(row.capital) + flt(row.intereses), 2));
-		actualizar_resumen(frm);
+		recalcular_saldos_cliente(frm);
+	},
+
+	total_cuota: function(frm, cdt, cdn) {
+		let row = locals[cdt][cdn];
+		let int_val = flt(row.intereses);
+		let cuota_val = flt(row.total_cuota);
+		let nuevo_cap = flt(cuota_val - int_val, 2);
+		if (nuevo_cap >= 0 && Math.abs(nuevo_cap - flt(row.capital)) > 0.009) {
+			frappe.model.set_value(cdt, cdn, "capital", nuevo_cap);
+		} else {
+			recalcular_saldos_cliente(frm);
+		}
 	},
 
 	status: function(frm, cdt, cdn) {
@@ -151,6 +198,23 @@ frappe.ui.form.on("Historico Cuota Financiamiento", {
 		actualizar_resumen(frm);
 	}
 });
+
+function recalcular_saldos_cliente(frm) {
+	let prev_balance = flt(frm.doc.capital_financiado);
+	(frm.doc.cuotas || []).forEach(function(row) {
+		row.saldo_anterior = prev_balance;
+		let cap = flt(row.capital);
+		let nuevo_saldo = prev_balance - cap;
+		if (nuevo_saldo < 0) nuevo_saldo = 0.0;
+		row.saldo = flt(nuevo_saldo, 2);
+		prev_balance = row.saldo;
+	});
+	if (frm.doc.cuotas && frm.doc.cuotas.length > 0) {
+		frm.doc.cuotas[frm.doc.cuotas.length - 1].saldo = 0.0;
+	}
+	frm.refresh_field("cuotas");
+	actualizar_resumen(frm);
+}
 
 function actualizar_resumen(frm) {
 	let total_cap = 0.0;

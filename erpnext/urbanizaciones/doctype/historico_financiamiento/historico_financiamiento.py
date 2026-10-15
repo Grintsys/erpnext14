@@ -23,7 +23,63 @@ class HistoricoFinanciamiento(Document):
 			if not self.capital_financiado or self.capital_financiado == 0:
 				self.capital_financiado = flt(flt(self.monto_contrato) - flt(self.prima), 2)
 
+		if self.status != "Migrado" and self.get("cuotas"):
+			self.recalcular_cadena_saldos_interna(auto_ajustar_residuo=True)
+		else:
+			self.recalcular_totales_internos()
+
+	def recalcular_cadena_saldos_interna(self, auto_ajustar_residuo=True):
+		"""
+		Recalcula la corrida completa de saldos (saldo_anterior y saldo) a lo largo
+		de toda la tabla a partir del capital financiado y los capitales ingresados.
+		Garantiza que la cadena de saldos esté siempre al día tanto al guardar como
+		al invocar la acción manual.
+		"""
+		cuotas = self.get("cuotas") or []
+		if not cuotas:
+			return {"success": True, "cuotas_pagadas": 0, "residuo_absorbido": 0.0}
+
+		getcontext().prec = 28
+		CENT = Decimal("0.01")
+
+		prev_balance = Decimal(str(self.capital_financiado or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+
+		for c in cuotas:
+			c.saldo_anterior = float(prev_balance)
+			cap = Decimal(str(c.capital or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+			nuevo_saldo = (prev_balance - cap).quantize(CENT, rounding=ROUND_HALF_UP)
+			if nuevo_saldo < Decimal("0.00"):
+				nuevo_saldo = Decimal("0.00")
+			c.saldo = float(nuevo_saldo)
+			prev_balance = nuevo_saldo
+
+		# Validar diferencia acumulada con el capital financiado
+		capital_esperado = Decimal(str(self.capital_financiado or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
+		total_cap_cuotas = sum(Decimal(str(c.capital or 0)) for c in cuotas).quantize(CENT, rounding=ROUND_HALF_UP)
+		diff_capital = (total_cap_cuotas - capital_esperado).quantize(CENT, rounding=ROUND_HALF_UP)
+
+		residuo_absorbido = 0.0
+		if abs(diff_capital) > Decimal("0.00") and auto_ajustar_residuo and abs(diff_capital) <= Decimal("100.00"):
+			last_row = cuotas[-1]
+			nuevo_cap_last = (Decimal(str(last_row.capital or 0)) - diff_capital).quantize(CENT, rounding=ROUND_HALF_UP)
+			last_row.capital = float(nuevo_cap_last)
+			last_row.total_cuota = float((nuevo_cap_last + Decimal(str(last_row.intereses or 0))).quantize(CENT, rounding=ROUND_HALF_UP))
+			last_row.saldo = 0.0
+			residuo_absorbido = float(diff_capital)
+
+		if cuotas:
+			cuotas[-1].saldo = 0.0
+
 		self.recalcular_totales_internos()
+
+		return {
+			"success": True,
+			"cuotas_pagadas": self.cuotas_pagadas_count,
+			"saldo_actual": self.saldo_actual,
+			"total_capital_cuotas": self.total_capital_cuotas,
+			"residuo_absorbido": residuo_absorbido,
+			"diff_capital": float(diff_capital),
+		}
 
 	def recalcular_totales_internos(self):
 		cuotas = self.get("cuotas") or []
@@ -156,56 +212,10 @@ def recalcular_cadena_saldos(docname, auto_ajustar_residuo=1):
 	if not doc.cuotas:
 		frappe.throw(_("No hay cuotas para recalcular."))
 
-	getcontext().prec = 28
-	CENT = Decimal("0.01")
-
-	prev_balance = Decimal(str(doc.capital_financiado or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
-
-	for c in doc.cuotas:
-		c.saldo_anterior = float(prev_balance)
-		cap = Decimal(str(c.capital or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
-		nuevo_saldo = (prev_balance - cap).quantize(CENT, rounding=ROUND_HALF_UP)
-		if nuevo_saldo < Decimal("0.00"):
-			nuevo_saldo = Decimal("0.00")
-		c.saldo = float(nuevo_saldo)
-		prev_balance = nuevo_saldo
-
-	# Validar diferencia con el capital financiado
-	capital_esperado = Decimal(str(doc.capital_financiado or 0)).quantize(CENT, rounding=ROUND_HALF_UP)
-	total_cap_cuotas = sum(Decimal(str(c.capital or 0)) for c in doc.cuotas).quantize(CENT, rounding=ROUND_HALF_UP)
-	diff_capital = (total_cap_cuotas - capital_esperado).quantize(CENT, rounding=ROUND_HALF_UP)
-
-	residuo_absorbido = 0.0
-	if abs(diff_capital) > Decimal("0.00"):
-		if int(auto_ajustar_residuo) and abs(diff_capital) <= Decimal("100.00"):
-			last_row = doc.cuotas[-1]
-			nuevo_cap_last = (Decimal(str(last_row.capital or 0)) - diff_capital).quantize(CENT, rounding=ROUND_HALF_UP)
-			last_row.capital = float(nuevo_cap_last)
-			last_row.total_cuota = float((nuevo_cap_last + Decimal(str(last_row.intereses or 0))).quantize(CENT, rounding=ROUND_HALF_UP))
-			last_row.saldo = 0.0
-			residuo_absorbido = float(diff_capital)
-		else:
-			frappe.msgprint(
-				_(
-					"Aviso: La suma de capitales de las cuotas ({0}) difiere del capital financiado ({1}) por {2}."
-				).format(float(total_cap_cuotas), float(capital_esperado), float(diff_capital)),
-				indicator="orange"
-			)
-
-	if doc.cuotas:
-		doc.cuotas[-1].saldo = 0.0
-
-	doc.recalcular_totales_internos()
+	res = doc.recalcular_cadena_saldos_interna(auto_ajustar_residuo=bool(int(auto_ajustar_residuo)))
 	doc.save(ignore_permissions=True)
 
-	return {
-		"success": True,
-		"cuotas_pagadas": doc.cuotas_pagadas_count,
-		"saldo_actual": doc.saldo_actual,
-		"total_capital_cuotas": doc.total_capital_cuotas,
-		"residuo_absorbido": residuo_absorbido,
-		"diff_capital": float(diff_capital),
-	}
+	return res
 
 
 @frappe.whitelist()
