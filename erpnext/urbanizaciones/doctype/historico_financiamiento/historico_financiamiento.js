@@ -1,4 +1,38 @@
 frappe.ui.form.on("Historico Financiamiento", {
+	setup: function(frm) {
+		// Filtrar activos disponibles o reservados para la urbanización seleccionada en cabecera
+		frm.set_query('activos', function () {
+			return {
+				query: 'erpnext.urbanizaciones.doctype.financiamientos.financiamientos.activo_disponible_query',
+				filters: {
+					urbanizaciones: frm.doc.urbanizaciones || '__NONE__',
+					current_doc: frm.doc.name || ''
+				}
+			};
+		});
+
+		frm.set_query('centro_costo', function () {
+			let filters = {
+				is_group: 0
+			};
+			if (frm.doc.company) {
+				filters.company = frm.doc.company;
+			}
+			return {
+				filters: filters
+			};
+		});
+	},
+
+	onload: function(frm) {
+		if (frm.is_new() && !frm.doc.company) {
+			let default_company = frappe.defaults.get_user_default('Company') || frappe.defaults.get_global_default('company');
+			if (default_company) {
+				frm.set_value('company', default_company);
+			}
+		}
+	},
+
 	refresh: function(frm) {
 		if (!frm.is_new() && frm.doc.status === "Borrador") {
 			frm.add_custom_button(__("Generar Cuotas Base"), function() {
@@ -145,6 +179,91 @@ frappe.ui.form.on("Historico Financiamiento", {
 			frm.add_custom_button(__("Ver Financiamiento Creado"), function() {
 				frappe.set_route("Form", "Financiamientos", frm.doc.financiamiento_creado);
 			}).addClass("btn-primary");
+		}
+	},
+
+	company: function(frm) {
+		if (frm.doc.centro_costo && frm.doc.company) {
+			frappe.db.get_value('Cost Center', frm.doc.centro_costo, 'company', function(r) {
+				if (r && r.company && r.company !== frm.doc.company) {
+					frm.set_value('centro_costo', '');
+				}
+			});
+		}
+	},
+
+	urbanizaciones: function(frm) {
+		if (frm.doc.urbanizaciones) {
+			if (!frm.doc.centro_costo) {
+				frappe.db.get_value('Urbanizaciones', frm.doc.urbanizaciones, 'cost_center', function(r) {
+					if (r && r.cost_center) {
+						frm.set_value('centro_costo', r.cost_center);
+					}
+				});
+			}
+		}
+		if (frm.doc.activos) {
+			frappe.db.get_value('Activos', frm.doc.activos, 'urbanizaciones', function(r) {
+				if (r && r.urbanizaciones !== frm.doc.urbanizaciones) {
+					frm.set_value('activos', '');
+				}
+			});
+		}
+	},
+
+	activos: function(frm) {
+		if (frm.doc.activos) {
+			frappe.db.get_value('Activos', frm.doc.activos, ['centro_de_costo', 'precio', 'status', 'descripcion_lote', 'urbanizaciones'], function(r) {
+				if (r) {
+					if (r.urbanizaciones && !frm.doc.urbanizaciones) {
+						frm.set_value('urbanizaciones', r.urbanizaciones);
+					}
+					if (r.centro_de_costo) {
+						frm.set_value('centro_costo', r.centro_de_costo);
+					}
+					if (r.precio && (!frm.doc.monto_contrato || frm.doc.monto_contrato === 0)) {
+						frm.set_value('monto_contrato', r.precio);
+					}
+					// Validar estado
+					if (r.status && r.status !== 'Disponible' && r.status !== 'Reservado' && frm.is_new()) {
+						frappe.msgprint({
+							title: __('Activo no Disponible'),
+							indicator: 'orange',
+							message: __('Advertencia: El activo <b>{0}</b> tiene estado <b>{1}</b>. Asegúrese de que esté disponible para venta.', [frm.doc.activos, r.status])
+						});
+					}
+				}
+			});
+		}
+	},
+
+	configuracion_financiamiento: function(frm) {
+		if (frm.doc.configuracion_financiamiento) {
+			frappe.db.get_value('Configuracion de Urbanizacion', frm.doc.configuracion_financiamiento,
+				['moneda_financiamiento', 'interes_anual', 'vencimiento_cuota', 'mora_diaria'],
+				function(r) {
+					if (r) {
+						if (r.moneda_financiamiento) {
+							frm.set_value('currency', r.moneda_financiamiento);
+						}
+						if (!frm.doc.company) {
+							let default_company = frappe.defaults.get_user_default('Company') || frappe.defaults.get_global_default('company');
+							if (default_company) {
+								frm.set_value('company', default_company);
+							}
+						}
+						if (r.interes_anual !== undefined && (!frm.doc.interes_anual || frm.doc.interes_anual === 0)) {
+							frm.set_value('interes_anual', r.interes_anual);
+						}
+						if (r.vencimiento_cuota && (!frm.doc.dia_vencimiento_cuota || frm.doc.dia_vencimiento_cuota === 0)) {
+							frm.set_value('dia_vencimiento_cuota', r.vencimiento_cuota);
+						}
+						if (r.mora_diaria !== undefined && (!frm.doc.mora_diaria || frm.doc.mora_diaria === 0)) {
+							frm.set_value('mora_diaria', r.mora_diaria);
+						}
+					}
+				}
+			);
 		}
 	},
 

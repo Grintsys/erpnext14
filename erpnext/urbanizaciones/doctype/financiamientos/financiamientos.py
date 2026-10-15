@@ -904,6 +904,8 @@ def activo_disponible_query(doctype, txt, searchfield, start, page_len, filters)
                 SELECT f.activos FROM `tabFinanciamientos` f WHERE f.name = %(current_doc)s
                 UNION
                 SELECT fad.activo FROM `tabFinanciamiento Activo Detalle` fad WHERE fad.parent = %(current_doc)s
+                UNION
+                SELECT hf.activos FROM `tabHistorico Financiamiento` hf WHERE hf.name = %(current_doc)s
             )
         )"""
         values["current_doc"] = current_doc

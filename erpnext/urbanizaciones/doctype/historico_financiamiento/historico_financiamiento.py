@@ -18,6 +18,8 @@ class HistoricoFinanciamiento(Document):
 		if not self.currency and self.company:
 			self.currency = frappe.get_cached_value("Company", self.company, "default_currency") or "HNL"
 
+		self.validate_activos_and_centro_costo()
+
 		if self.monto_contrato and self.prima is not None:
 			# Si el usuario no especificó manualmente capital_financiado, calcularlo
 			if not self.capital_financiado or self.capital_financiado == 0:
@@ -27,6 +29,97 @@ class HistoricoFinanciamiento(Document):
 			self.recalcular_cadena_saldos_interna(auto_ajustar_residuo=True)
 		else:
 			self.recalcular_totales_internos()
+
+	def validate_activos_and_centro_costo(self):
+		# 1. Validar y autocompletar Centro de Costo
+		if not self.centro_costo:
+			if self.activos:
+				self.centro_costo = frappe.db.get_value("Activos", self.activos, "centro_de_costo")
+			if not self.centro_costo and self.urbanizaciones:
+				self.centro_costo = frappe.db.get_value("Urbanizaciones", self.urbanizaciones, "cost_center")
+
+		if not self.centro_costo:
+			frappe.throw(_("El Centro de Costo es obligatorio."))
+
+		if self.centro_costo:
+			cc_data = frappe.db.get_value("Cost Center", self.centro_costo, ["is_group", "company"], as_dict=True)
+			if not cc_data:
+				frappe.throw(_("El Centro de Costo '{0}' no existe.").format(self.centro_costo))
+			if cc_data.is_group:
+				frappe.throw(_("El Centro de Costo '{0}' es de tipo grupo y no puede recibir transacciones.").format(self.centro_costo))
+			if self.company and cc_data.company and cc_data.company != self.company:
+				frappe.throw(
+					_("El Centro de Costo '{0}' pertenece a '{1}', no a la compañía seleccionada '{2}'.").format(
+						self.centro_costo, cc_data.company, self.company
+					)
+				)
+
+		# 2. Validar Activos
+		if not self.activos:
+			frappe.throw(_("Debe seleccionar un Activo para el histórico de financiamiento."))
+
+		act_data = frappe.db.get_value("Activos", self.activos, ["urbanizaciones", "status", "descripcion_lote"], as_dict=True)
+		if not act_data:
+			frappe.throw(_("El Activo '{0}' no existe.").format(self.activos))
+
+		# Validar pertenencia a la urbanización
+		if self.urbanizaciones and act_data.urbanizaciones and act_data.urbanizaciones != self.urbanizaciones:
+			desc = act_data.descripcion_lote or self.activos
+			frappe.throw(
+				_("El Activo ({0} - {1}) no pertenece a la Urbanización seleccionada ({2}).").format(
+					self.activos, desc, self.urbanizaciones
+				)
+			)
+
+		# Validar que no esté financiado en otro contrato oficial activo
+		if self.status == "Borrador":
+			otro_fin = frappe.db.sql(
+				"""
+				SELECT f.name, f.status
+				FROM `tabFinanciamientos` f
+				WHERE (f.name != %s OR %s IS NULL)
+				  AND f.status IN ('Activo', 'Refinanciado', 'Completado')
+				  AND (
+				      f.activos = %s
+				      OR EXISTS (
+				          SELECT 1 FROM `tabFinanciamiento Activo Detalle` fad
+				          WHERE fad.parent = f.name AND fad.activo = %s
+				      )
+				  )
+				LIMIT 1
+				""",
+				(self.financiamiento_creado or "NUEVO", self.financiamiento_creado, self.activos, self.activos),
+				as_dict=True,
+			)
+			if otro_fin:
+				frappe.throw(
+					_(
+						"El Activo <b>{0} ({1})</b> ya se encuentra con estado <b>{2}</b> en el contrato oficial <b>{3}</b>.<br>"
+						"Únicamente se pueden financiar activos disponibles o reservados."
+					).format(
+						self.activos, act_data.descripcion_lote or "", act_data.status, otro_fin[0].name
+					)
+				)
+
+			# Validar que no esté duplicado en otro Historico Financiamiento en Borrador
+			otro_hf = frappe.db.sql(
+				"""
+				SELECT name, status
+				FROM `tabHistorico Financiamiento`
+				WHERE name != %s
+				  AND activos = %s
+				  AND status = 'Borrador'
+				LIMIT 1
+				""",
+				(self.name or "NUEVO", self.activos),
+				as_dict=True,
+			)
+			if otro_hf:
+				frappe.throw(
+					_(
+						"El Activo <b>{0}</b> ya se encuentra en otro Histórico de Financiamiento en Borrador: <b>{1}</b>."
+					).format(self.activos, otro_hf[0].name)
+				)
 
 	def recalcular_cadena_saldos_interna(self, auto_ajustar_residuo=True):
 		"""
